@@ -1,0 +1,12 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Your turntable/shutter memory files (optional, but usually ignored)
+*_state.json
+
+# System files
+.DS_Store
+.vscode/
+
+.lgd-nfy0
