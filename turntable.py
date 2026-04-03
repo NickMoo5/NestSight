@@ -5,7 +5,7 @@ import os
 import time
 
 class Turntable:
-    def __init__(self, gear_ratio=3.35, config_file="turntable_state.json"):
+    def __init__(self, gear_ratio=3.39, config_file="turntable_state.json"):
         # Initialize Motor 2 from hardware_defines
         self.motor = StepperDriver(
             step_pin=hw.M2_STEP,
@@ -64,11 +64,11 @@ class Turntable:
 
         # Auto-Reverse Logic
         if self.data["pos"] >= self.total_pulses_per_rev:
-            self.data["dir"] = "CCW"
+            self.data["dir"] = "CW"
             print("--- Turntable reached 360° limit: Reversing to CCW ---")
             change_direction = True
         elif self.data["pos"] <= 0:
-            self.data["dir"] = "CW"
+            self.data["dir"] = "CCW"
             print("--- Turntable reached 0° limit: Reversing to CW ---")
             change_direction = True
 
@@ -89,12 +89,12 @@ def main():
     print("Starting scan loop. Press Ctrl+C to stop.")
 
     try:
-        # while True:
-        #     if turntable.step(speed=0.001): break
+        while True:
+            if turntable.step(speed=0.001): break
 
-        for i in range(10): 
-            turntable.step(speed=0.003)
-            time.sleep(0.2)
+        # for i in range(10): 
+        #     turntable.step(speed=0.003)
+        #     time.sleep(0.2)
         
         
         

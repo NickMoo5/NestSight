@@ -10,3 +10,7 @@ __pycache__/
 .vscode/
 
 .lgd-nfy0
+
+*.pdf
+captures*/
+temp_report_images/
