@@ -55,7 +55,10 @@ def main():
             frame_bgr = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             save_image(frame_bgr)
             num_imgs = num_imgs + 1
-            if turntable.step(speed=0.001): break     
+            if turntable.step(speed=0.001): break
+
+        while True:
+            if turntable.step(speed=0.001): break
     except KeyboardInterrupt:
         print("\nStopping scanner...")
     finally:

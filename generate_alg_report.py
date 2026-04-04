@@ -13,7 +13,7 @@ import time
 # -----------------------------
 # SETTINGS
 # -----------------------------
-INPUT_DIR = "captures_good"
+INPUT_DIR = "captures"
 OUTPUT_PDF = "laser_report.pdf"
 TEMP_DIR = "temp_report_images"
 
@@ -23,7 +23,12 @@ styles = getSampleStyleSheet()
 
 # store topmost points for graph
 top_points = []
+defect_result = "Not Computed"
 
+spike_result = "Not computed"
+spike_regions = []
+
+gap_values = []
 
 # -----------------------------
 # IMAGE SCALING
@@ -138,8 +143,12 @@ def generate_top_point_graph():
 
     plt.plot(x, y, marker='o')
 
-    for i, txt in enumerate(x):
-        plt.annotate(str(txt), (x[i], y[i]))
+    # for i, txt in enumerate(x):
+    #     plt.annotate(str(txt), (x[i], y[i]))
+    # Highlight detected spike regions
+    for start, end in spike_regions:
+        plt.axvspan(start, end, alpha=0.3)
+
 
     plt.xlabel("Image Index (Rotation Order)")
     plt.ylabel("Top-most Laser Point (pixels)")
@@ -186,6 +195,168 @@ def generate_fft_graph():
 
     return graph_path
 
+def analyze_fft_defects():
+
+    global defect_result
+
+    if len(top_points) < 8:
+        defect_result = "Not enough samples"
+        return
+
+    y = np.array([p[1] for p in top_points])
+
+    # remove DC offset
+    y = y - np.mean(y)
+
+    fft_vals = np.fft.fft(y)
+    magnitude = np.abs(fft_vals)
+
+    # ignore DC component
+    magnitude = magnitude[1:len(magnitude)//2]
+
+    dominant = np.max(magnitude)
+    avg_energy = np.mean(magnitude)
+
+    # periodicity score
+    score = dominant / (avg_energy + 1e-6)
+
+    if score > 3:
+        defect_result = f"GOOD (strong periodic structure, score={score:.2f})"
+    elif score > 1.8:
+        defect_result = f"BORDERLINE (score={score:.2f})"
+    else:
+        defect_result = f"DEFECT SUSPECTED (irregular spectrum, score={score:.2f})"
+
+# -----------------------------
+# SPIKE / DEFECT DETECTION
+# -----------------------------
+def smooth_signal(y, window=7):
+    return np.convolve(y, np.ones(window)/window, mode='same')
+
+
+def find_regions(mask, min_length=5):
+    regions = []
+    start = None
+
+    for i, val in enumerate(mask):
+        if val and start is None:
+            start = i
+        elif not val and start is not None:
+            if i - start >= min_length:
+                regions.append((start, i))
+            start = None
+
+    if start is not None and len(mask) - start >= min_length:
+        regions.append((start, len(mask)))
+
+    return regions
+
+
+def detect_spike_defects():
+    global spike_result, spike_regions
+
+    if len(top_points) < 10:
+        spike_result = "Not enough samples"
+        spike_regions = []
+        return
+
+    y = np.array([p[1] for p in top_points])
+
+    # Smooth signal
+    y_smooth = smooth_signal(y)
+
+    # Baseline (robust)
+    baseline = np.median(y_smooth)
+
+    # Deviation from baseline
+    deviation = y_smooth - baseline
+
+    # Threshold (tune this if needed)
+    threshold = 30
+
+    mask = deviation > threshold
+
+    # Find consecutive regions
+    spike_regions = find_regions(mask, min_length=5)
+
+    if spike_regions:
+        descriptions = []
+        for start, end in spike_regions:
+            width = end - start
+            height = np.max(y[start:end]) - baseline
+            descriptions.append(
+                f"[{start}-{end}] width={width}, height={height:.1f}px"
+            )
+
+        spike_result = "DEFECT: Missing feather section(s) at " + ", ".join(descriptions)
+    else:
+        spike_result = "No large localized defects detected"
+
+# -----------------------------
+# GAP STATISTICS
+# -----------------------------
+def compute_gap_statistics():
+    global avg_gap, max_gap, high_gap_ratio
+
+    if len(gap_values) == 0:
+        avg_gap = 0
+        max_gap = 0
+        high_gap_ratio = 0
+        return
+
+    g = np.array(gap_values)
+
+    avg_gap = np.mean(g)
+    max_gap = np.max(g)
+
+    # % of frames with significant gaps
+    high_gap_frames = np.sum(g > 5)  # threshold (tune)
+    high_gap_ratio = (high_gap_frames / len(g)) * 100
+
+def classify_final_result():
+    global final_result
+
+    final_result = "UNDETERMINED"
+
+    # FFT score
+    fft_score = 0
+    if "score=" in defect_result:
+        try:
+            fft_score = float(defect_result.split("score=")[1].strip(")"))
+        except:
+            fft_score = 0
+
+    has_spike_defect = len(spike_regions) > 0
+
+    # -----------------------------
+    # DECISION LOGIC
+    # -----------------------------
+
+    # 🔴 HARD FAIL conditions
+    if max_gap > 25:
+        final_result = f"FAIL ❌ (Severe local damage, max gap={max_gap:.1f}%)"
+        return
+
+    if avg_gap > 10:
+        final_result = f"FAIL ❌ (High overall material loss, avg gap={avg_gap:.1f}%)"
+        return
+
+    # 🟠 Moderate defects
+    if high_gap_ratio > 20:
+        final_result = f"FAIL ❌ (Widespread defects: {high_gap_ratio:.1f}% frames affected)"
+        return
+
+    if has_spike_defect:
+        final_result = "BORDERLINE ⚠️ (Localized structural defect detected)"
+        return
+
+    # 🟢 Structure check
+    if fft_score > 3:
+        final_result = "PASS ✅ (Uniform structure, minimal gaps)"
+    elif fft_score > 1.8:
+        final_result = "BORDERLINE ⚠️ (Minor irregularities)"
+    else:
+        final_result = "FAIL ❌ (Irregular structure)"
 
 # -----------------------------
 # GENERATE REPORT
@@ -205,6 +376,11 @@ def generate_report():
             continue
 
         files, gap = result
+
+        if gap is not None:
+            gap_values.append(gap)
+        else:
+            gap_values.append(0)
 
         story.append(Paragraph(f"<b>Capture {idx}: {filename}</b>", styles['Title']))
         
@@ -243,6 +419,10 @@ def generate_report():
 
         story.append(PageBreak())
 
+    analyze_fft_defects()
+    detect_spike_defects()
+    compute_gap_statistics()
+    classify_final_result()
     # -----------------------------
     # Add Graph Page
     # -----------------------------
@@ -254,6 +434,11 @@ def generate_report():
         story.append(Spacer(1, 20))
 
         story.append(get_scaled_image(graph_path, 6*inch))
+
+        story.append(Spacer(1, 20))
+        story.append(Paragraph("<b>Spike Defect Detection:</b>", styles['Heading2']))
+        story.append(Spacer(1, 10))
+        story.append(Paragraph(spike_result, styles['Normal']))
 
     # -----------------------------
     # Add FFT Spectrum Page
@@ -268,12 +453,27 @@ def generate_report():
 
         story.append(get_scaled_image(fft_path, 6*inch))
 
+        story.append(Spacer(1, 20))
+        story.append(Paragraph("<b>Defect Analysis Result:</b>", styles['Heading2']))
+        story.append(Spacer(1, 10))
+        story.append(Paragraph(defect_result, styles['Normal']))
+
+    story.append(Paragraph("<b>Gap Analysis:</b>", styles['Heading2']))
+    story.append(Spacer(1, 10))
+
+    story.append(Paragraph(f"Average Gap: {avg_gap:.2f}%", styles['Normal']))
+    story.append(Paragraph(f"Max Gap: {max_gap:.2f}%", styles['Normal']))
+    story.append(Paragraph(f"Frames with Significant Gaps (>5%): {high_gap_ratio:.1f}%", styles['Normal']))
+
+    story.append(Paragraph("<b>Overall Result:</b>", styles['Heading2']))
+    story.append(Spacer(1, 10))
+    story.append(Paragraph(final_result, styles['Normal']))
+
     doc = SimpleDocTemplate(OUTPUT_PDF)
     doc.build(story)
 
     print("PDF report saved:", OUTPUT_PDF)
-
-
+        
 # -----------------------------
 # RUN
 # -----------------------------
@@ -285,37 +485,3 @@ if __name__ == "__main__":
     print(f"Images processed in: {(end - start) * 1000:.2f} ms") 
 
     # Add 'laser surface profiler', laser stripe center extraction
-
-    '''
-def analyze_fft_defects():
-
-    global defect_result
-
-    if len(top_points) < 8:
-        defect_result = "Not enough samples"
-        return
-
-    y = np.array([p[1] for p in top_points])
-
-    # remove DC offset
-    y = y - np.mean(y)
-
-    fft_vals = np.fft.fft(y)
-    magnitude = np.abs(fft_vals)
-
-    # ignore DC component
-    magnitude = magnitude[1:len(magnitude)//2]
-
-    dominant = np.max(magnitude)
-    avg_energy = np.mean(magnitude)
-
-    # periodicity score
-    score = dominant / avg_energy
-
-    if score > 3:
-        defect_result = f"GOOD (strong periodic structure, score={score:.2f})"
-    elif score > 1.8:
-        defect_result = f"BORDERLINE (score={score:.2f})"
-    else:
-        defect_result = f"DEFECT SUSPECTED (irregular spectrum, score={score:.2f})"
-    '''
