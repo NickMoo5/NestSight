@@ -54,7 +54,7 @@ def process_image(image_path, name_prefix, image_index):
         return None
 
     # 1. Crop the image first
-    img = img_full[100:320, 330:420].copy()
+    img = img_full[100:320, 330:390].copy()
     h, w = img.shape[:2]
 
     # 2. Convert to Grayscale (Brightness) instead of HSV
@@ -75,7 +75,7 @@ def process_image(image_path, name_prefix, image_index):
     final_gapped_line = np.zeros((h, w), dtype=np.uint8)
     output = img.copy()
     gap_percentage = None
-
+    
     if len(points) > 10:
         # Prepare points for line fitting
         points_xy = points[:, [1, 0]].astype(np.float32)
@@ -89,8 +89,8 @@ def process_image(image_path, name_prefix, image_index):
         p2 = (int(x0 + vx * 500), int(y0 + vy * 500))
         cv2.line(math_line_mask, p1, p2, 255, 1)
 
-        # Identify where the laser exists ALONG that math line
-        gate_mask = cv2.dilate(laser_mask, np.ones((3, 3), np.uint8))
+        kernel = np.ones((2, 15), np.uint8)   # height=1, width=8        only grow horizontally
+        gate_mask = cv2.dilate(laser_mask, kernel)
         final_gapped_line = cv2.bitwise_and(math_line_mask, gate_mask)
 
         # 5. Extract Topmost Point & Gaps
@@ -109,7 +109,32 @@ def process_image(image_path, name_prefix, image_index):
             if total_possible > 0:
                 gap_percentage = (max(0, total_possible - actual_present) / total_possible) * 100
                 cv2.putText(output, f"Gaps: {gap_percentage:.1f}%", (5, 20),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 255, 0), 1)
+    
+    # slicing horizontally
+    # if len(points) > 10:
+    #     # 1. Determine the vertical bounds of the laser
+    #     y_coords = points[:, 0]
+    #     y_min, y_max = np.min(y_coords), np.max(y_coords)
+        
+    #     top_points.append((image_index, int(y_min)))
+        
+    #     # 2. Collapse the mask horizontally (Projection)
+    #     # This checks if ANY pixel in a row is part of the laser
+    #     row_sum = np.sum(skeleton[y_min:y_max+1, :], axis=1)
+        
+    #     # 3. Calculate coverage
+    #     # A row is 'filled' if the sum of pixels in that row > 0
+    #     rows_with_laser = np.count_nonzero(row_sum)
+    #     total_rows = y_max - y_min + 1
+        
+    #     if total_rows > 0:
+    #         # We calculate "Presence" first, then convert to Gap
+    #         presence_percentage = (rows_with_laser / total_rows) * 100
+    #         gap_percentage = 100 - presence_percentage
+            
+    #         cv2.putText(output, f"Gaps: {gap_percentage:.1f}%", (5, 20),
+    #                     cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
 
     # Visual Overlay
     output[final_gapped_line > 0] = [0, 255, 0]
@@ -123,6 +148,7 @@ def process_image(image_path, name_prefix, image_index):
 
     save_temp("overlay", output)
     save_temp("thresh_mask", laser_mask)
+    save_temp("dilated_mask", gate_mask)
     save_temp("math_line", math_line_mask)
 
     return files, gap_percentage
@@ -347,7 +373,7 @@ def classify_final_result():
         return
 
     if has_spike_defect:
-        final_result = "BORDERLINE ⚠️ (Localized structural defect detected)"
+        final_result = "FAIL ⚠️ (Localized structural defect detected)"
         return
 
     # 🟢 Structure check
@@ -392,13 +418,14 @@ def generate_report():
         # --- NEW 3-COLUMN LOGIC ---
         # We want: [Overlay] [Thresh Mask] [Math Line]
         row = [
-            get_scaled_image(files["overlay"], 2.3 * inch),
-            get_scaled_image(files["thresh_mask"], 2.3 * inch),
-            get_scaled_image(files["math_line"], 2.3 * inch)
+            get_scaled_image(files["overlay"], 1.7 * inch),
+            get_scaled_image(files["thresh_mask"], 1.7 * inch),
+            get_scaled_image(files["dilated_mask"], 1.7 * inch),
+            get_scaled_image(files["math_line"], 1.7 * inch),
         ]
 
         # Create table with 3 columns
-        table = Table([row], colWidths=[2.4*inch, 2.4*inch, 2.4*inch])
+        table = Table([row], colWidths=[1.7*inch, 1.7*inch, 1.7*inch, 1.7*inch])
         
         # Add some padding/styling to the table
         table.setStyle([
