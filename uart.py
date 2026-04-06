@@ -2,17 +2,25 @@ import serial
 import threading
 import queue
 import time
+from enum import Enum
 
 # =======================
 # CONFIG
 # =======================
-UART_PORT = "/dev/serial0"   # or "/dev/ttyAMA0" / "/dev/ttyUSB0"
+UART_PORT = "/dev/ttyAMA0"   # or "/dev/ttyAMA0" / "/dev/ttyUSB0"
 UART_BAUD = 115200
 
 # =======================
 # MESSAGE TYPES
 # =======================
-class RxMsg:
+class RxMsg(Enum):
+    EJECT = "EJECT"
+    EVAL  = "EVAL"
+    N     = "N"
+    S     = "S"
+    NONE  = ""
+
+class TxMsg(Enum):
     PASS = "PASS"
     FAIL = "FAIL"
     READY = "READY"
@@ -20,12 +28,18 @@ class RxMsg:
     NONE = "NONE"
     UNKNOWN = "UNKNOWN"
 
-class TxMsg:
-    EJECT = "EJECT"
-    EVAL  = "EVAL"
-    N     = "N"
-    S     = "S"
-    NONE  = ""
+MSG_MAP = {
+    "PASS": TxMsg.PASS,
+    "FAIL": TxMsg.FAIL,
+    "READY": TxMsg.READY,
+    "SET": TxMsg.SET,
+    "UNKNOWN": TxMsg.NONE,
+    "EJECT" : RxMsg.EJECT,
+    "EVAL" : RxMsg.EVAL,
+    "N"    : RxMsg.N,
+    "S"    : RxMsg.S,
+    "NONE" : RxMsg.NONE
+}
 
 # =======================
 # UART HANDLER
@@ -59,22 +73,11 @@ class UARTHandler:
         return f"<{msg_type}>"
 
     # =======================
-    # PARSE
-    # =======================
-    def _parse_message(self, msg):
-        if msg == "PASS": return RxMsg.PASS
-        if msg == "FAIL": return RxMsg.FAIL
-        if msg == "READY": return RxMsg.READY
-        if msg == "SET": return RxMsg.SET
-        if msg == "": return RxMsg.NONE
-        return RxMsg.UNKNOWN
-
-    # =======================
     # SEND (PUBLIC)
     # =======================
-    def send(self, msg_type):
+    def send(self, msg_type: TxMsg):
         try:
-            self.tx_queue.put_nowait(msg_type)
+            self.tx_queue.put_nowait(msg_type.value)
         except queue.Full:
             print("[UART] TX queue full")
 
@@ -109,9 +112,8 @@ class UARTHandler:
                 elif c == '>' and self.receiving:
                     self.receiving = False
 
-                    msg_type = self._parse_message(self.buffer)
-
-                    self._handle_message(msg_type)
+                    msg_type = MSG_MAP.get(self.buffer, RxMsg.NONE)
+                    print(f"[UART RX] {msg_type.value}")
 
                 elif self.receiving:
                     self.buffer += c
@@ -122,25 +124,6 @@ class UARTHandler:
                         self.receiving = False
 
             time.sleep(0.01)
-
-    # =======================
-    # USER HANDLER
-    # =======================
-    def _handle_message(self, msg_type):
-        if msg_type == RxMsg.PASS:
-            print("YES")
-
-        elif msg_type == RxMsg.FAIL:
-            print("YES2")
-
-        elif msg_type == RxMsg.READY:
-            print("ESP READY")
-
-        elif msg_type == RxMsg.SET:
-            print("SET RECEIVED")
-
-        elif msg_type == RxMsg.UNKNOWN:
-            print("UNKNOWN MSG")
 
     # =======================
     # STOP
@@ -162,8 +145,7 @@ def main():
         while True:
             # Periodic send (every 3 sec)
             if time.time() - last_send > 3:
-                uart.send(TxMsg.EVAL)
-                print("Sent: <EVAL>")
+                uart.send(TxMsg.PASS)
                 last_send = time.time()
 
             # Manual send from keyboard
