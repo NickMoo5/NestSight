@@ -260,7 +260,7 @@ class LaserSurfaceProfiler:
         result = self.evaluate()
         # self._generate_pdf()
         self.generate_pdf_report()
-
+        self.reset()
         print("FINAL:", result)
 
     # -----------------------------
@@ -422,7 +422,7 @@ class LaserSurfaceProfiler:
 
         return Image(path, width=width, height=height)
 
-        # -----------------------------
+    # -----------------------------
     # RESET / CLEANUP
     # -----------------------------
     def reset(self):
