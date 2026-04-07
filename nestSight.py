@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 # -----------------------------
 # CLASS
 # -----------------------------
-class LaserSurfaceProfiler:
+class NestSight:
     def __init__(self, developer_mode=False):
         self.developer_mode = developer_mode
 
@@ -30,9 +30,13 @@ class LaserSurfaceProfiler:
         self.fourier_result = "Not computed"
         self.spike_result = "Not computed"
         self.final_result = "UNDETERMINED"
+        self.fft_score = 0
+
+        self.frame_width = 60
+        self.frame_x_start = 330
 
         # Queue system
-        self.image_queue = queue.Queue(maxsize=20)
+        self.image_queue = queue.Queue(maxsize=200)
         self.running = True
 
         # Thread
@@ -88,7 +92,7 @@ class LaserSurfaceProfiler:
     # CORE IMAGE PROCESSING
     # -----------------------------
     def _process_single(self, img_full, image_index):
-        img = img_full[100:320, 330:390].copy()
+        img = img_full[100:295, 280:340].copy()
         h, w = img.shape[:2]
 
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -137,6 +141,8 @@ class LaserSurfaceProfiler:
 
 
         self.gap_values.append(gap)
+
+        print(f"Processed frame : {image_index}")
 
         # Dev mode image saving
         if self.developer_mode:
@@ -226,7 +232,7 @@ class LaserSurfaceProfiler:
         self.fft_score = score
 
         # Classify result
-        if score > 3:
+        if score > 5:
             self.fourier_result = f"GOOD (strong periodic structure, score={score:.2f})"
         elif score > 1.8:
             self.fourier_result = f"BORDERLINE (minor irregularities, score={score:.2f})"
@@ -242,7 +248,7 @@ class LaserSurfaceProfiler:
             self.final_result = "FAIL"
         elif len(self.spike_regions) > 0:
             self.final_result = "FAIL"
-        elif self.fft_score > 3:
+        elif self.fft_score > 5:
             self.final_result = "PASS"
         else:
             self.final_result = "BORDERLINE"
@@ -444,8 +450,8 @@ class LaserSurfaceProfiler:
                 os.remove(os.path.join(self.temp_dir, f))
 
 def main():
-    profiler = LaserSurfaceProfiler(developer_mode=True)
-    profiler.run_developer_mode("captures")
+    profiler = NestSight(developer_mode=True)
+    profiler.run_developer_mode("captures_2")
 
 if __name__ == "__main__":
     start = time.perf_counter()

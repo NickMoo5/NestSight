@@ -13,7 +13,7 @@ class Shutter:
 
     SPEED = 0.0003
 
-    def __init__(self, steps_to_move=600, config_file="shutter_state.json"):
+    def __init__(self, steps_to_move=630, config_file="shutter_state.json"):
         # Initialize the shared driver using our specific Hardware Defines
         self.motor = StepperDriver(
             step_pin=hw.M1_STEP,

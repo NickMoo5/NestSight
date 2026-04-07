@@ -4,7 +4,10 @@ import json
 import os
 import time
 
+FULL_REV = 360
+
 class Turntable:
+
     def __init__(self, gear_ratio=3.39, config_file="turntable_state.json"):
         # Initialize Motor 2 from hardware_defines
         self.motor = StepperDriver(
@@ -23,7 +26,8 @@ class Turntable:
         self.total_pulses_per_rev = int(800 * gear_ratio) 
         
         # 15 pulses = ~1.985 degrees at the turntable surface
-        self.pulses_per_move = 15 
+        self.pulses_per_move = 15
+        self.degrees_per_move = 2 
         
         self.config_file = config_file
         self.data = self._load_data()
@@ -48,28 +52,28 @@ class Turntable:
         change_direction = False
         """Rotates the turntable ~2 degrees and auto-reverses at 360°."""
         current_dir_enum = Direction.CCW if self.data["dir"] == "CCW" else Direction.CW          
-        if current_dir_enum == Direction.CCW:       # reverse direction due to gearing
-            reverse_dir = Direction.CW
-        elif current_dir_enum == Direction.CW:
-            reverse_dir = Direction.CCW
+        # if current_dir_enum == Direction.CCW:       # reverse direction due to gearing
+        #     reverse_dir = Direction.CW
+        # elif current_dir_enum == Direction.CW:
+        #     reverse_dir = Direction.CCW
 
         # Move the 15-pulse burst (Quarter Stepping)
-        self.motor.move(self.pulses_per_move, reverse_dir, speed)
+        self.motor.move(self.pulses_per_move, current_dir_enum, speed)
         
         # Update tracking based on direction
-        if self.data["dir"] == "CW":
-            self.data["pos"] -= self.pulses_per_move
+        if self.data["dir"] == "CCW":
+            self.data["pos"] += self.degrees_per_move
         else:
-            self.data["pos"] += self.pulses_per_move
+            self.data["pos"] -= self.degrees_per_move
 
         # Auto-Reverse Logic
-        if self.data["pos"] >= self.total_pulses_per_rev:
+        if self.data["pos"] >= FULL_REV:
             self.data["dir"] = "CW"
-            print("--- Turntable reached 360° limit: Reversing to CCW ---")
+            print("--- Turntable reached 360° limit: Reversing to CW ---")
             change_direction = True
         elif self.data["pos"] <= 0:
             self.data["dir"] = "CCW"
-            print("--- Turntable reached 0° limit: Reversing to CW ---")
+            print("--- Turntable reached 0° limit: Reversing to CCW ---")
             change_direction = True
 
         self._save_data()
@@ -79,6 +83,8 @@ class Turntable:
     def cleanup(self):
         """Disables motor and closes GPIO chip"""
         print("Cleaning up Turntable resources...")
+        while self.data["pos"] != 0: 
+           self.step(speed=0.001)
         self.motor.cleanup()
 
 def main():
@@ -87,14 +93,14 @@ def main():
     turntable = Turntable()
 
     print("Starting scan loop. Press Ctrl+C to stop.")
-
     try:
+        # turntable.cleanup()
         while True:
             if turntable.step(speed=0.001): break
 
-        # for i in range(10): 
-        #     turntable.step(speed=0.003)
-        #     time.sleep(0.2)
+    #     # for i in range(10): 
+    #     #     turntable.step(speed=0.003)
+    #     #     time.sleep(0.2)
         
         
         

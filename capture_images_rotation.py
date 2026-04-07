@@ -5,14 +5,16 @@ from turntable import Turntable
 import os
 from datetime import datetime
 
-def save_image(frame):
+DIR = "captures_2"
+
+def save_image(frame, dir):
     # 1. Create folder if it doesn't exist
-    if not os.path.exists("captures_good"):
-        os.makedirs("captures_good")
+    if not os.path.exists(dir):
+        os.makedirs(dir)
     
     # 2. Find the next available index
     # List all files, filter for those starting with 'image_' and ending in '.jpg'
-    existing_files = [f for f in os.listdir("captures_good") if f.startswith("image_") and f.endswith(".jpg")]
+    existing_files = [f for f in os.listdir(dir) if f.startswith("image_") and f.endswith(".jpg")]
     
     if not existing_files:
         next_index = 0
@@ -29,7 +31,7 @@ def save_image(frame):
         next_index = max(indices) + 1 if indices else 0
 
     # 3. Save with the new index
-    filename = f"captures_good/image_{next_index}.jpg"
+    filename = f"{dir}/image_{next_index}.jpg"
     cv2.imwrite(filename, frame)
     print(f"--- Image saved to {filename} ---")
 
@@ -49,15 +51,15 @@ def main():
 
     try:
         while True:
+            if turntable.step(speed=0.001): break
+
+        while True:
             # Capture a frame as a numpy array
             frame = picam2.capture_array()
             # Picamera2 outputs RGB, OpenCV expects BGR
             frame_bgr = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            save_image(frame_bgr)
+            save_image(frame_bgr, DIR)
             num_imgs = num_imgs + 1
-            if turntable.step(speed=0.001): break
-
-        while True:
             if turntable.step(speed=0.001): break
     except KeyboardInterrupt:
         print("\nStopping scanner...")
