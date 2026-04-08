@@ -36,7 +36,7 @@ try:
 
         # Picamera2 outputs RGB, OpenCV expects BGR
         frame_bgr = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        img = frame_bgr[100:295, 280:340].copy()
+        img = frame_bgr[120:315, 280:350].copy()
         # 4. Show the frame in a window
         cv2.imshow("Raspberry Pi 5 Camera", img)
 

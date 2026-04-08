@@ -64,6 +64,7 @@ class Shutter:
         self._save_state()
 
     def cleanup(self):
+        self.close()
         self.motor.cleanup()
         print(f"Last known state: {self.state.name}")
 
@@ -72,7 +73,7 @@ def main():
     try:
         shutter.open()
         time.sleep(1)
-        shutter.close()
+        # shutter.close()
     finally:
         shutter.cleanup()
 

@@ -18,6 +18,7 @@ class RxMsg(Enum):
     EVAL  = "EVAL"
     N     = "N"
     S     = "S"
+    CLEAN = "CLEANUP"
     NONE  = ""
 
 class TxMsg(Enum):
@@ -48,6 +49,7 @@ class UARTHandler:
     def __init__(self):
         self.ser = serial.Serial(UART_PORT, UART_BAUD, timeout=0.01)
         self.tx_queue = queue.Queue(maxsize=10)
+        self.rx_queue = queue.Queue(maxsize=20)
 
         self.running = True
 
@@ -112,8 +114,12 @@ class UARTHandler:
                 elif c == '>' and self.receiving:
                     self.receiving = False
 
-                    msg_type = MSG_MAP.get(self.buffer, RxMsg.NONE)
+                    msg_type = MSG_MAP.get(self.buffer, RxMsg.NONE) 
                     print(f"[UART RX] {msg_type.value}")
+                    try:
+                        self.rx_queue.put_nowait(msg_type)
+                    except queue.Full:
+                        print("[UART] RX queue full")
 
                 elif self.receiving:
                     self.buffer += c
@@ -124,6 +130,12 @@ class UARTHandler:
                         self.receiving = False
 
             time.sleep(0.01)
+
+    def get_message(self) -> RxMsg:
+        try:
+            return self.rx_queue.get_nowait()
+        except queue.Empty:
+            return None
 
     # =======================
     # STOP
@@ -145,7 +157,7 @@ def main():
         while True:
             # Periodic send (every 3 sec)
             if time.time() - last_send > 3:
-                uart.send(TxMsg.PASS)
+                uart.send(TxMsg.FAIL)
                 last_send = time.time()
 
             # Manual send from keyboard

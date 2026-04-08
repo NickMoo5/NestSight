@@ -63,7 +63,7 @@ def main():
             if use_keyboard:
                 if keyboard.is_pressed('space'):
                     trigger = True
-                    print("Triggered via SPACE!")
+                    print("Triggered via SPACE!!!!!!!!!!!!!!")
             else:
                 input("Press Enter to trigger motors...")
                 trigger = True
@@ -95,7 +95,7 @@ def main():
     finally:
         motor1.cleanup()
         motor2.cleanup()
-        print("Motors disabled, lgpio handles closed. Cleanup complete.")
+        print("Motors disabled, lgpio handles closed. Cleanup complete. nathaniel was here")
 
 if __name__ == "__main__":
     main()

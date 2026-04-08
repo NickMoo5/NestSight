@@ -22,6 +22,8 @@ class Qcm:
         self._camera_config()
         self.nestSight.start()
 
+        self.close_shutter()
+
     def _camera_config(self):
         config = self.camera.create_preview_configuration(main={"format": 'BGR888', "size": (640, 480)})
         self.camera.configure(config)
@@ -52,9 +54,15 @@ class Qcm:
         self.frame_idx = 0
         return result
     
-    def open_shutter(self):
+    def drop(self):
         self.shutter.open()
         time.sleep(1)
+        self.shutter.close()
+
+    def open_shutter(self):
+        self.shutter.open()
+
+    def close_shutter(self):
         self.shutter.close()
 
     def cleanup(self):
@@ -67,12 +75,12 @@ def main():
     qcm = Qcm()
 
     try:
-        while True:
-            print("Evaluating Birdie")
+    
+        print("Evaluating Birdie")
 
-            result = qcm.evaluate_birdie()
-            print(f"VERDICT:    {result}")
-            time.sleep(30)     
+        result = qcm.evaluate_birdie()
+        print(f"VERDICT:    {result}")
+        qcm.drop()
     except KeyboardInterrupt:
         print("Exiting...")
     finally:

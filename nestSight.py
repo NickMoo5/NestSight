@@ -46,6 +46,9 @@ class NestSight:
         self.temp_dir = "temp_report_images"
         self.output_pdf = "NestSight_report.pdf"
 
+        self.submitted_count = 0
+        self.process_count = 0
+
         if self.developer_mode:
             os.makedirs(self.temp_dir, exist_ok=True)
 
@@ -64,6 +67,7 @@ class NestSight:
     # -----------------------------
     def submit_image(self, img, index):
         self.image_queue.put((img, index))
+        self.submitted_count += 1
 
     # -----------------------------
     # PROCESS TASK (THREAD)
@@ -86,13 +90,13 @@ class NestSight:
         # Queue empty + top_points length matches number of submitted images
         # We assume each submit_image increments the queue, each processed image updates top_points/gap_values
         # Slightly more robust: check gap_values length against images submitted
-        return self.image_queue.empty()
+        return self.process_count == self.submitted_count
 
     # -----------------------------
     # CORE IMAGE PROCESSING
     # -----------------------------
     def _process_single(self, img_full, image_index):
-        img = img_full[100:295, 280:340].copy()
+        img = img_full[120:315, 280:350].copy()
         h, w = img.shape[:2]
 
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -141,6 +145,8 @@ class NestSight:
 
 
         self.gap_values.append(gap)
+
+        self.process_count += 1
 
         print(f"Processed frame : {image_index}")
 
@@ -251,7 +257,7 @@ class NestSight:
         elif self.fft_score > 5:
             self.final_result = "PASS"
         else:
-            self.final_result = "BORDERLINE"
+            self.final_result = "FAIL"
 
     # -----------------------------
     # DEV MODE RUN (DIRECTORY)
@@ -443,6 +449,9 @@ class NestSight:
         self.fourier_result = "Not computed"
         self.spike_result = "Not computed"
         self.final_result = "UNDETERMINED"
+
+        self.submitted_count = 0
+        self.process_count = 0
 
         # Optionally clear temp images in developer mode
         if self.developer_mode:
