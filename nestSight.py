@@ -92,75 +92,7 @@ class NestSight:
         # Slightly more robust: check gap_values length against images submitted
         return self.process_count == self.submitted_count
 
-    # -----------------------------
-    # CORE IMAGE PROCESSING
-    # -----------------------------
-    def _process_single(self, img_full, image_index):
-        img = img_full[120:315, 280:350].copy()
-        h, w = img.shape[:2]
-
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        _, laser_mask = cv2.threshold(gray, 190, 255, cv2.THRESH_BINARY)
-
-        kernel = np.ones((1, 1), np.uint8)
-        skeleton = cv2.morphologyEx(laser_mask, cv2.MORPH_OPEN, kernel)
-
-        points = np.column_stack(np.where(skeleton > 0))
-
-        if len(points) < 10:
-            self.gap_values.append(0)
-            return
-
-        points_xy = points[:, [1, 0]].astype(np.float32)
-        vx, vy, x0, y0 = [v[0] for v in cv2.fitLine(points_xy, cv2.DIST_L2, 0, 0.01, 0.01)]
-
-        math_line_mask = np.zeros((h, w), dtype=np.uint8)
-        p1 = (int(x0 - vx * 500), int(y0 - vy * 500))
-        p2 = (int(x0 + vx * 500), int(y0 + vy * 500))
-        cv2.line(math_line_mask, p1, p2, 255, 1)
-
-        kernel = np.ones((1, 20), np.uint8)
-        gate_mask = cv2.dilate(laser_mask, kernel)
-
-        final = cv2.bitwise_and(math_line_mask, gate_mask)
-
-        active = np.column_stack(np.where(final > 0))
-
-        if len(active) == 0:
-            self.gap_values.append(100)
-            return
-
-        y_min = np.min(active[:, 0])
-        y_max = np.max(active[:, 0])
-
-        self.top_points.append((image_index, int(y_min)))
-
-        segment = np.zeros_like(math_line_mask)
-        segment[y_min:y_max, :] = math_line_mask[y_min:y_max, :]
-
-        total = np.count_nonzero(segment)
-        present = np.count_nonzero(final)
-
-        gap = (max(0, total - present) / total) * 100 if total > 0 else 0
-
-
-        self.gap_values.append(gap)
-
-        self.process_count += 1
-
-        print(f"Processed frame : {image_index}")
-
-        # Dev mode image saving
-        if self.developer_mode:
-            frame_data = {
-            "overlay": img.copy(),      # final overlay image
-            "laser_mask": laser_mask,
-            "dilated_mask": gate_mask,
-            "math_line": math_line_mask
-            }
-
-            self.processed_images.append(frame_data)
-
+    
     # -----------------------------
     # ANALYSIS
     # -----------------------------
@@ -457,6 +389,76 @@ class NestSight:
         if self.developer_mode:
             for f in os.listdir(self.temp_dir):
                 os.remove(os.path.join(self.temp_dir, f))
+
+# -----------------------------
+# CORE IMAGE PROCESSING
+# -----------------------------
+def _process_single(img_full, image_index):
+    img = img_full[120:315, 280:350].copy()
+    h, w = img.shape[:2]
+
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    _, laser_mask = cv2.threshold(gray, 190, 255, cv2.THRESH_BINARY)
+
+    kernel = np.ones((1, 1), np.uint8)
+    skeleton = cv2.morphologyEx(laser_mask, cv2.MORPH_OPEN, kernel)
+
+    points = np.column_stack(np.where(skeleton > 0))
+
+    if len(points) < 10:
+        self.gap_values.append(0)
+        return
+
+    points_xy = points[:, [1, 0]].astype(np.float32)
+    vx, vy, x0, y0 = [v[0] for v in cv2.fitLine(points_xy, cv2.DIST_L2, 0, 0.01, 0.01)]
+
+    math_line_mask = np.zeros((h, w), dtype=np.uint8)
+    p1 = (int(x0 - vx * 500), int(y0 - vy * 500))
+    p2 = (int(x0 + vx * 500), int(y0 + vy * 500))
+    cv2.line(math_line_mask, p1, p2, 255, 1)
+
+    kernel = np.ones((1, 20), np.uint8)
+    gate_mask = cv2.dilate(laser_mask, kernel)
+
+    final = cv2.bitwise_and(math_line_mask, gate_mask)
+
+    active = np.column_stack(np.where(final > 0))
+
+    if len(active) == 0:
+        self.gap_values.append(100)
+        return
+
+    y_min = np.min(active[:, 0])
+    y_max = np.max(active[:, 0])
+
+    self.top_points.append((image_index, int(y_min)))
+
+    segment = np.zeros_like(math_line_mask)
+    segment[y_min:y_max, :] = math_line_mask[y_min:y_max, :]
+
+    total = np.count_nonzero(segment)
+    present = np.count_nonzero(final)
+
+    gap = (max(0, total - present) / total) * 100 if total > 0 else 0
+
+
+    self.gap_values.append(gap)
+
+    self.process_count += 1
+
+    print(f"Processed frame : {image_index}")
+
+    # Dev mode image saving
+    if self.developer_mode:
+        frame_data = {
+        "overlay": img.copy(),      # final overlay image
+        "laser_mask": laser_mask,
+        "dilated_mask": gate_mask,
+        "math_line": math_line_mask
+        }
+
+        self.processed_images.append(frame_data)
+
 
 def main():
     profiler = NestSight(developer_mode=True)
