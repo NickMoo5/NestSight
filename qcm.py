@@ -36,11 +36,9 @@ class Qcm:
             print("Capturing Frame")
             frame = self.camera.capture_array()
             # Picamera2 outputs RGB, OpenCV expects BGR
-            print("Converting Frame")
-            frame_bgr = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
             print("Submitting to queue")
-            self.nestSight.submit_image(frame_bgr, self.frame_idx)
+            cropped = frame[100:295, 280:340]
+            self.nestSight.submit_image(cropped, self.frame_idx)
             self.frame_idx = self.frame_idx + 1
 
             if self.turntable.step(speed=0.001): 
@@ -73,6 +71,7 @@ class Qcm:
 
     def cleanup(self):
         self.nestSight.stop()
+        self.nestSight.shutdown_pool()
         self.turntable.cleanup()
         self.shutter.cleanup()
         self.camera.stop()

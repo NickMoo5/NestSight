@@ -380,6 +380,11 @@ class NestSight:
 
         return Image(path, width=width, height=height)
 
+    def shutdown_pool(self):
+        if hasattr(self, "pool"):
+            self.pool.close()   # no more tasks
+            self.pool.join()    # wait for workers
+
     # -----------------------------
     # RESET / CLEANUP
     # -----------------------------
@@ -409,8 +414,9 @@ class NestSight:
 # -----------------------------
 def process_single_worker(data):
     img_full, image_index = data
+    img = cv2.cvtColor(img_full, cv2.COLOR_BGR2RGB)
 
-    img = img_full[100:295, 280:340].copy()
+    # img = frame_bgr[100:295, 280:340].copy()
     h, w = img.shape[:2]
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
