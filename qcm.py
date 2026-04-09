@@ -65,6 +65,9 @@ class Qcm:
     def close_shutter(self):
         self.shutter.close()
 
+    def turntableHome(self):
+        self.turntable.returnHome()
+
     def cleanup(self):
         self.nestSight.stop()
         self.turntable.cleanup()

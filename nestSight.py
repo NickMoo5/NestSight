@@ -90,7 +90,8 @@ class NestSight:
         # Queue empty + top_points length matches number of submitted images
         # We assume each submit_image increments the queue, each processed image updates top_points/gap_values
         # Slightly more robust: check gap_values length against images submitted
-        return self.process_count == self.submitted_count
+        # return self.process_count == self.submitted_count
+        return self.image_queue.empty()
 
     # -----------------------------
     # CORE IMAGE PROCESSING

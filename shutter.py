@@ -73,7 +73,7 @@ def main():
     try:
         shutter.open()
         time.sleep(1)
-        # shutter.close()
+        shutter.close()
     finally:
         shutter.cleanup()
 
