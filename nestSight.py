@@ -11,6 +11,7 @@ from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
 
 import matplotlib.pyplot as plt
+import multiprocessing as mp
 
 # -----------------------------
 # CLASS
@@ -93,9 +94,19 @@ class NestSight:
         # Queue empty + top_points length matches number of submitted images
         # We assume each submit_image increments the queue, each processed image updates top_points/gap_values
         # Slightly more robust: check gap_values length against images submitted
-        return self.process_count == self.submitted_count
+        return all(r.ready() for r in self.pending_results)
 
-    
+    def collect_results(self):
+        for r in self.pending_results:
+            image_index, y_min, gap = r.get()
+
+            if y_min is not None:
+                self.top_points.append((image_index, y_min))
+
+            self.gap_values.append(gap)
+
+        self.pending_results = []
+
     # -----------------------------
     # ANALYSIS
     # -----------------------------

@@ -48,8 +48,11 @@ class Qcm:
                 break
 
         while not self.nestSight.all_images_processed():
-            time.sleep(0.5)
+            time.sleep(0.1)
+
+        self.nestSight.collect_results()
         result = self.nestSight.evaluate()
+
         self.nestSight.reset()
         self.frame_idx = 0
         return result
