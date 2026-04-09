@@ -69,7 +69,8 @@ class mainProcess:
                         elif msg == RxMsg.CLEANUP:
                             print("[SYS] Cleaning system up")
                             self.operation_mode = None
-                            self.qcm.cleanup()
+                            self.qcm.turntableHome()
+                            self.uart.send(TxMsg.READY)
                     elif self.running:
                         if msg == RxMsg.EJECT:
                             print("[SYS] Ejecting birdie")
