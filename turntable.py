@@ -80,11 +80,14 @@ class Turntable:
 
         return change_direction
 
+    def returnHome(self):
+        while self.data["pos"] != 0: 
+           self.step(speed=0.001)
+
     def cleanup(self):
         """Disables motor and closes GPIO chip"""
         print("Cleaning up Turntable resources...")
-        while self.data["pos"] != 0: 
-           self.step(speed=0.001)
+        self.returnHome()
         self.motor.cleanup()
 
 def main():

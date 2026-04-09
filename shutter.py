@@ -72,8 +72,8 @@ def main():
     shutter = Shutter()
     try:
         shutter.open()
-        time.sleep(1000)
-        # shutter.close()
+        time.sleep(1)
+        shutter.close()
     finally:
         shutter.cleanup()
 

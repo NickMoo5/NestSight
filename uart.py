@@ -18,7 +18,7 @@ class RxMsg(Enum):
     EVAL  = "EVAL"
     N     = "N"
     S     = "S"
-    CLEAN = "CLEANUP"
+    CLEANUP = "CLEANUP"
     NONE  = ""
 
 class TxMsg(Enum):
@@ -39,6 +39,7 @@ MSG_MAP = {
     "EVAL" : RxMsg.EVAL,
     "N"    : RxMsg.N,
     "S"    : RxMsg.S,
+    "CLEANUP" : RxMsg.CLEANUP,
     "NONE" : RxMsg.NONE
 }
 

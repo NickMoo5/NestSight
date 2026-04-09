@@ -40,58 +40,66 @@ class mainProcess:
                         print("[SYS] Setting Normal Operation Mode")
                         self.operation_mode = opMode.NORMAL
                         self.qcm.close_shutter()
-                        uart.send(TxMsg.SET)
+                        self.uart.send(TxMsg.SET)
 
                     elif msg == RxMsg.S:
                         print("[SYS] Setting Skip Operation Mode")
                         self.operation_mode = opMode.SKIP
                         self.qcm.open_shutter()
-                        uart.send(TxMsg.SET)
+                        self.uart.send(TxMsg.SET)
                     else:
                         print(f"ERROR: received unintended msg: {msg.value}")
                 # =======================
                 # HANDLE COMMANDS
                 # =======================
-                elif self.operation_mode == opMode.NORMAL or self.running:
-                    if msg == RxMsg.EVAL:
-                        print("[SYS] Starting evaluation")
-                        self.running = True
-                        result = self.qcm.evaluate_birdie()
+                elif self.operation_mode == opMode.NORMAL:
+                    if not self.running:
+                        if msg == RxMsg.EVAL:
+                            print("[SYS] Starting evaluation")
+                            self.running = True
+                            result = self.qcm.evaluate_birdie()
 
-                        print(f"[SYS] Result: {result}")
+                            print(f"[SYS] Result: {result}")
 
-                        if result == "PASS":
-                            self.uart.send(TxMsg.PASS)
+                            if result == "PASS":
+                                self.uart.send(TxMsg.PASS)
+                            else:
+                                self.uart.send(TxMsg.FAIL)
+
+                        elif msg == RxMsg.CLEANUP:
+                            print("[SYS] Cleaning system up")
+                            self.operation_mode = None
+                            self.qcm.turntableHome()
+                            self.uart.send(TxMsg.READY)
+                    elif self.running:
+                        if msg == RxMsg.EJECT:
+                            print("[SYS] Ejecting birdie")
+                            self.qcm.drop()
+                            self.running = False
+                            self.uart.send(TxMsg.READY)
+
                         else:
-                            self.uart.send(TxMsg.FAIL)
-
-                    elif msg == RxMsg.EJECT:
-                        print("[SYS] Ejecting birdie")
-                        self.qcm.drop()
-                        self.running = False
-                        self.uart.send(TxMsg.READY)
-
-                    else:
-                        print(f"ERROR: received unintended msg: {msg.value}")
+                            print(f"ERROR running: received unintended msg: {msg.value}")
                 elif not self.running:
                     if msg == RxMsg.N:
                         print("[SYS] Setting Normal Operation Mode")
                         self.operation_mode = opMode.NORMAL
                         self.qcm.close_shutter()
-                        uart.send(TxMsg.SET)
+                        self.uart.send(TxMsg.SET)
 
                     elif msg == RxMsg.S:
                         print("[SYS] Setting Skip Operation Mode")
                         self.operation_mode = opMode.SKIP
                         self.qcm.open_shutter()
-                        uart.send(TxMsg.SET)
+                        self.uart.send(TxMsg.SET)
                     elif msg == RxMsg.CLEANUP:
                         print("[SYS] Cleaning system up")
                         self.operation_mode = None
-                        self.qcm.cleanup()
+                        self.qcm.turntableHome()
+                        self.uart.send(TxMsg.READY)
                         
                     else:
-                        print(f"ERROR: received unintended msg: {msg.value}")
+                        print(f"ERROR not running: received unintended msg: {msg.value}")
 
 
         except KeyboardInterrupt:
