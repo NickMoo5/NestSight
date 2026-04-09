@@ -49,6 +49,9 @@ class NestSight:
         self.submitted_count = 0
         self.process_count = 0
 
+        self.pool = mp.Pool(processes=mp.cpu_count())
+        self.pending_results = []   
+
         if self.developer_mode:
             os.makedirs(self.temp_dir, exist_ok=True)
 
@@ -66,8 +69,8 @@ class NestSight:
     # ADD IMAGE (from camera)
     # -----------------------------
     def submit_image(self, img, index):
-        self.image_queue.put((img, index))
-        self.submitted_count += 1
+        result = self.pool.apply_async(process_single_worker, args=((img, index),))
+        self.pending_results.append(result)
 
     # -----------------------------
     # PROCESS TASK (THREAD)
@@ -393,8 +396,10 @@ class NestSight:
 # -----------------------------
 # CORE IMAGE PROCESSING
 # -----------------------------
-def _process_single(img_full, image_index):
-    img = img_full[120:315, 280:350].copy()
+def process_single_worker(data):
+    img_full, image_index = data
+
+    img = img_full[100:295, 280:340].copy()
     h, w = img.shape[:2]
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -406,8 +411,7 @@ def _process_single(img_full, image_index):
     points = np.column_stack(np.where(skeleton > 0))
 
     if len(points) < 10:
-        self.gap_values.append(0)
-        return
+        return (image_index, None, 0)
 
     points_xy = points[:, [1, 0]].astype(np.float32)
     vx, vy, x0, y0 = [v[0] for v in cv2.fitLine(points_xy, cv2.DIST_L2, 0, 0.01, 0.01)]
@@ -425,13 +429,10 @@ def _process_single(img_full, image_index):
     active = np.column_stack(np.where(final > 0))
 
     if len(active) == 0:
-        self.gap_values.append(100)
-        return
+        return (image_index, None, 100)
 
     y_min = np.min(active[:, 0])
     y_max = np.max(active[:, 0])
-
-    self.top_points.append((image_index, int(y_min)))
 
     segment = np.zeros_like(math_line_mask)
     segment[y_min:y_max, :] = math_line_mask[y_min:y_max, :]
@@ -441,24 +442,7 @@ def _process_single(img_full, image_index):
 
     gap = (max(0, total - present) / total) * 100 if total > 0 else 0
 
-
-    self.gap_values.append(gap)
-
-    self.process_count += 1
-
-    print(f"Processed frame : {image_index}")
-
-    # Dev mode image saving
-    if self.developer_mode:
-        frame_data = {
-        "overlay": img.copy(),      # final overlay image
-        "laser_mask": laser_mask,
-        "dilated_mask": gate_mask,
-        "math_line": math_line_mask
-        }
-
-        self.processed_images.append(frame_data)
-
+    return (image_index, int(y_min), gap)
 
 def main():
     profiler = NestSight(developer_mode=True)
