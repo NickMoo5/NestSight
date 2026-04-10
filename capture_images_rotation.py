@@ -5,7 +5,7 @@ from turntable import Turntable
 import os
 from datetime import datetime
 
-DIR = "captures_2"
+DIR = "captures_8"
 
 def save_image(frame, dir):
     # 1. Create folder if it doesn't exist

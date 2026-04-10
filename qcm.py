@@ -37,6 +37,7 @@ class Qcm:
 
     def evaluate_birdie(self):
         print("Evaluating Birdie")
+        self.close_shutter()
         while True:
             # Capture a frame as a numpy array
             print("Capturing Frame")
@@ -46,7 +47,7 @@ class Qcm:
                 continue
             # Picamera2 outputs RGB, OpenCV expects BGR
             print("Submitting to queue")
-            cropped = frame[100:300, 270:350]
+            cropped = frame[90:300, 270:350]
             self.nestSight.submit_image(cropped, self.frame_idx)
             self.frame_idx = self.frame_idx + 1
 

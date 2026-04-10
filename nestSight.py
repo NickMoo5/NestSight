@@ -99,12 +99,14 @@ class NestSight:
 
     def collect_results(self):
         for r in self.pending_results:
-            image_index, y_min, gap = r.get()
+            image_index, y_min, gap, frame_data = r.get()
 
             if y_min is not None:
                 self.top_points.append((image_index, y_min))
 
             self.gap_values.append(gap)
+
+            self.processed_images.append(frame_data)
 
         self.pending_results = []
 
@@ -214,8 +216,13 @@ class NestSight:
 
         for i, f in enumerate(files):
             img = cv2.imread(os.path.join(input_dir, f))
-            self._process_single(img, i)
+            cropped = img[100:300, 270:350]
+            self.submit_image(cropped, i)
 
+        while not self.all_images_processed():
+            time.sleep(0.1)
+
+        self.collect_results()    
         result = self.evaluate()
         # self._generate_pdf()
         self.generate_pdf_report()
@@ -260,10 +267,11 @@ class NestSight:
         for idx, frame_data in enumerate(self.processed_images):
             # frame_data = {'overlay': overlay_img, 'laser_mask': mask, 'dilated_mask': dilated, 'math_line': line}
             files = {}
-            for label, img in frame_data.items():
-                path = os.path.join(self.temp_dir, f"img{idx}_{label}.png")
-                cv2.imwrite(path, img)
-                files[label] = path
+            if frame_data:
+                for label, img in frame_data.items():
+                    path = os.path.join(self.temp_dir, f"img{idx}_{label}.png")
+                    cv2.imwrite(path, img)
+                    files[label] = path
 
             story.append(Paragraph(f"<b>Capture {idx}</b>", styles['Title']))
             story.append(Spacer(1, 10))
@@ -480,7 +488,10 @@ def process_single_worker(data):
     points = np.column_stack(np.where(skeleton > 0))
 
     if len(points) < 10:
-        return (image_index, None, 0)
+        # cv2.imshow("window", img)
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
+        return (image_index, None, 0, None)
 
     points_xy = points[:, [1, 0]].astype(np.float32)
     vx, vy, x0, y0 = [v[0] for v in cv2.fitLine(points_xy, cv2.DIST_L2, 0, 0.01, 0.01)]
@@ -498,7 +509,7 @@ def process_single_worker(data):
     active = np.column_stack(np.where(final > 0))
 
     if len(active) == 0:
-        return (image_index, None, 100)
+        return (image_index, None, 100, None)
 
     y_min = np.min(active[:, 0])
     y_max = np.max(active[:, 0])
@@ -511,11 +522,18 @@ def process_single_worker(data):
 
     gap = (max(0, total - present) / total) * 100 if total > 0 else 0
 
-    return (image_index, int(y_min), gap)
+    frame_data = {
+        "overlay": img.copy(),      # final overlay image
+        "laser_mask": laser_mask,
+        "dilated_mask": gate_mask,
+        "math_line": math_line_mask
+        }
+
+    return (image_index, int(y_min), gap, frame_data)
 
 def main():
     profiler = NestSight(developer_mode=True)
-    profiler.run_developer_mode("captures_2")
+    profiler.run_developer_mode("captures_5")
 
 if __name__ == "__main__":
     start = time.perf_counter()

@@ -9,6 +9,7 @@ from enum import Enum
 class opMode(Enum):
     NORMAL = "NORMAL"
     SKIP = "SKIP"
+    IDLE = "IDLE"
 
 class mainProcess:
 
@@ -34,6 +35,8 @@ class mainProcess:
                 if msg is None:
                     time.sleep(0.05)
                     continue
+
+                
 
                 if not self.operation_mode:
                     if msg == RxMsg.N:
