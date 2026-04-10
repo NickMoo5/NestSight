@@ -17,7 +17,7 @@ class StepperDriver:
         for pin in [step_pin, dir_pin, en_pin] + list(ms_pins):
             lgpio.gpio_claim_output(self.h, pin)
         
-        self.enable()
+        #self.enable()
 
     def enable(self): lgpio.gpio_write(self.h, self.en_pin, 0)
     def disable(self): lgpio.gpio_write(self.h, self.en_pin, 1)

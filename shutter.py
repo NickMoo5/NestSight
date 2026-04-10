@@ -49,7 +49,9 @@ class Shutter:
         
         print("Opening Shutter...")
         # We use Direction.CW or CCW from the driver class
+        self.motor.enable()
         self.motor.move(self.steps_to_move, Direction.CCW, speed)
+        self.motor.disable()
         self.state = ShutterState.OPEN
         self._save_state()
 
@@ -59,12 +61,14 @@ class Shutter:
             return
             
         print("Closing Shutter...")
+        self.motor.enable()
         self.motor.move(self.steps_to_move, Direction.CW, speed)
+        self.motor.disable()
         self.state = ShutterState.CLOSED
         self._save_state()
 
     def cleanup(self):
-        self.close()
+        # self.close()
         self.motor.cleanup()
         print(f"Last known state: {self.state.name}")
 

@@ -106,13 +106,18 @@ class mainProcess:
             print("Shutting down...")
 
         finally:
-            self.uart.stop()
-            self.qcm.cleanup()
+            self.cleanup()
+            os._exit(0)
 
 
 def main():
-    runProcess = mainProcess()
-    runProcess.run()
+    try:
+        runProcess = mainProcess()
+        runProcess.run()
+    except KeyboardInterrupt:
+        runProcess.clean()
+    finally:
+        runProcess.clean()
 
 
 # --- Execution ---

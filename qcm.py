@@ -22,22 +22,31 @@ class Qcm:
         self._camera_config()
         self.nestSight.start()
 
+        self.latest_frame = None
         self.close_shutter()
 
     def _camera_config(self):
         config = self.camera.create_preview_configuration(main={"format": 'BGR888', "size": (640, 480)})
         self.camera.configure(config)
+        self.camera.post_callback = self._frame_callback
         self.camera.start()
+
+    def _frame_callback(self, request):
+        frame = request.make_array("main")
+        self.latest_frame = frame
 
     def evaluate_birdie(self):
         print("Evaluating Birdie")
         while True:
             # Capture a frame as a numpy array
             print("Capturing Frame")
-            frame = self.camera.capture_array()
+            # frame = self.camera.capture_array()
+            frame = self.latest_frame
+            if frame is None:
+                continue
             # Picamera2 outputs RGB, OpenCV expects BGR
             print("Submitting to queue")
-            cropped = frame[100:295, 280:340]
+            cropped = frame[100:300, 270:350]
             self.nestSight.submit_image(cropped, self.frame_idx)
             self.frame_idx = self.frame_idx + 1
 
@@ -71,7 +80,7 @@ class Qcm:
 
     def cleanup(self):
         self.nestSight.stop()
-        self.nestSight.shutdown_pool()
+        # self.nestSight.shutdown_pool()
         self.turntable.cleanup()
         self.shutter.cleanup()
         self.camera.stop()
@@ -90,6 +99,7 @@ def main():
         print("Exiting...")
     finally:
         qcm.cleanup()
+        os._exit(0)
 
 # --- Execution ---
 if __name__ == "__main__":

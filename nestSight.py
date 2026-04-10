@@ -4,6 +4,7 @@ import numpy as np
 import threading
 import queue
 import time
+import signal
 
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak, Table
 from reportlab.lib.styles import getSampleStyleSheet
@@ -380,10 +381,61 @@ class NestSight:
 
         return Image(path, width=width, height=height)
 
+    # def shutdown_pool(self):
+    #     if hasattr(self, "pool"):
+    #         self.pool.terminate()   # no more tasks
+    #         self.pool.join()    # wait for workers
+
     def shutdown_pool(self):
-        if hasattr(self, "pool"):
-            self.pool.close()   # no more tasks
-            self.pool.join()    # wait for workers
+        if self.pool is None:
+            return
+        print(f"Active workers: {[p.is_alive() for p in self.pool._pool]}")
+
+        print("[POOL] Shutting down...")
+
+        # self.pool.terminate()
+
+        for p in self.pool._pool:
+            if p.is_alive():
+                print(f"[POOL] Force killing {p.pid}")
+                p.kill()
+        # ⏳ wait a short time only
+        print("[POOL] Shutdown complete")
+
+# def shutdown_pool(self):
+#     if self.pool is None:
+#         return
+
+#     print("[POOL] Force shutdown...")
+
+#     # 🔒 Prevent Ctrl+C interruption
+#     old_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+#     try:
+#         # 💀 Step 1: KILL ALL WORKERS IMMEDIATELY
+#         for p in self.pool._pool:
+#             if p.is_alive():
+#                 print(f"[POOL] Killing PID {p.pid}")
+#                 p.kill()
+
+#         # ⏳ Step 2: wait briefly for OS cleanup
+#         time.sleep(0.5)
+
+#         # 🧹 Step 3: now try cleanup (won’t hang anymore)
+#         try:
+#             self.pool.terminate()
+#         except Exception as e:
+#             print(f"[POOL] terminate() error (ignored): {e}")
+
+#         try:
+#             self.pool.join()
+#         except Exception as e:
+#             print(f"[POOL] join() error (ignored): {e}")
+
+#     finally:
+#         signal.signal(signal.SIGINT, old_handler)
+
+#     print("[POOL] Shutdown complete")
 
     # -----------------------------
     # RESET / CLEANUP
