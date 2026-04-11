@@ -79,6 +79,12 @@ class Qcm:
     def turntableHome(self):
         self.turntable.returnHome()
 
+    def turntableOn(self):
+        self.turntable.enable()
+
+    def turntableOff(self):
+        self.turntable.disable()
+
     def cleanup(self):
         self.nestSight.stop()
         # self.nestSight.shutdown_pool()

@@ -33,6 +33,12 @@ class Turntable:
         self.data = self._load_data()
         print(f"Turntable System Online. Current Position: {self.data['pos']} Direction: {self.data["dir"]}")
 
+    def enable(self):
+        self.motor.enable()
+
+    def disable(self):
+        self.motor.disable()
+
     def _load_data(self):
         """Loads position and direction from turntable_state.json"""
         if os.path.exists(self.config_file):

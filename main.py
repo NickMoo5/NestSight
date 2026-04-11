@@ -19,6 +19,7 @@ class mainProcess:
         self.uart.start()
         self.operation_mode = None
         self.running = False
+        self.skip_mode_on = False
 
     def cleanup(self):
         self.qcm.cleanup()
@@ -32,17 +33,22 @@ class mainProcess:
             while True:
                 msg = self.uart.get_message()
 
-                if msg is None:
-                    time.sleep(0.05)
-                    continue
+                time.sleep(0.05)
 
-                
+                if msg == RxMsg.CLEANUP and not self.running:
+                    print("[SYS] Cleaning system up")
+                    self.operation_mode = opMode.IDLE
+                    self.qcm.turntableHome()
+                    self.qcm.turntableOff()
 
-                if not self.operation_mode:
-                    if msg == RxMsg.N:
+                if self.operation_mode == opMode.IDLE:
+                    if msg is None:
+                        self.uart.send(TxMsg.READY)
+                    elif msg == RxMsg.N:
                         print("[SYS] Setting Normal Operation Mode")
                         self.operation_mode = opMode.NORMAL
                         self.qcm.close_shutter()
+                        self.qcm.turntableOn()
                         self.uart.send(TxMsg.SET)
 
                     elif msg == RxMsg.S:
@@ -68,12 +74,8 @@ class mainProcess:
                                 self.uart.send(TxMsg.PASS)
                             else:
                                 self.uart.send(TxMsg.FAIL)
-
-                        elif msg == RxMsg.CLEANUP:
-                            print("[SYS] Cleaning system up")
-                            self.operation_mode = None
-                            self.qcm.turntableHome()
-                            self.uart.send(TxMsg.READY)
+                        else:
+                            print(f"ERROR running: received unintended msg: {msg.value}")
                     elif self.running:
                         if msg == RxMsg.EJECT:
                             print("[SYS] Ejecting birdie")
@@ -83,24 +85,11 @@ class mainProcess:
 
                         else:
                             print(f"ERROR running: received unintended msg: {msg.value}")
-                elif not self.running:
-                    if msg == RxMsg.N:
-                        print("[SYS] Setting Normal Operation Mode")
-                        self.operation_mode = opMode.NORMAL
-                        self.qcm.close_shutter()
-                        self.uart.send(TxMsg.SET)
-
-                    elif msg == RxMsg.S:
-                        print("[SYS] Setting Skip Operation Mode")
-                        self.operation_mode = opMode.SKIP
+                elif self.operation_mode == opMode.SKIP:
+                    if not self.skip_mode_on:
                         self.qcm.open_shutter()
-                        self.uart.send(TxMsg.SET)
-                    elif msg == RxMsg.CLEANUP:
-                        print("[SYS] Cleaning system up")
-                        self.operation_mode = None
-                        self.qcm.turntableHome()
-                        self.uart.send(TxMsg.READY)
-                        
+                        self.skip_mode_on = True
+                        print("[SYS] SKIP mode activated. Opening Shutter")
                     else:
                         print(f"ERROR not running: received unintended msg: {msg.value}")
 

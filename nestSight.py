@@ -105,8 +105,8 @@ class NestSight:
                 self.top_points.append((image_index, y_min))
 
             self.gap_values.append(gap)
-
-            self.processed_images.append(frame_data)
+            if self.developer_mode:
+                self.processed_images.append(frame_data)
 
         self.pending_results = []
 
