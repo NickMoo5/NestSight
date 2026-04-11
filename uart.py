@@ -3,6 +3,7 @@ import threading
 import queue
 import time
 from enum import Enum
+from datetime import datetime
 
 # =======================
 # CONFIG
@@ -69,6 +70,12 @@ class UARTHandler:
         self.tx_thread.start()
         self.rx_thread.start()
 
+    @staticmethod
+    def ts_print(msg):
+        # Formats as: [18:30:05.123] message
+        timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        print(f"[{timestamp}] {msg}")
+
     # =======================
     # FORMAT
     # =======================
@@ -82,7 +89,7 @@ class UARTHandler:
         try:
             self.tx_queue.put_nowait(msg_type.value)
         except queue.Full:
-            print("[UART] TX queue full")
+            self.ts_print("[UART] TX queue full")
 
     # =======================
     # TX THREAD
@@ -95,42 +102,50 @@ class UARTHandler:
 
                 self.ser.write((msg + "\n").encode())
 
-                print(f"[UART TX] {msg}")
+                self.ts_print(f"[UART TX] {msg}")
 
             except queue.Empty:
                 continue
 
-    # =======================
-    # RX THREAD
-    # =======================
     def _rx_worker(self):
-        while self.running:
-            while self.ser.in_waiting:
-                c = self.ser.read().decode(errors="ignore")
+            self.ts_print("[UART] RX Thread Started")
+            while self.running:
+                try:
+                    # 1. Check if serial is actually valid/open
+                    if self.ser is None or not self.ser.is_open:
+                        time.sleep(0.1)
+                        continue
 
-                if c == '<':
-                    self.buffer = ""
-                    self.receiving = True
+                    while self.ser.in_waiting:
+                        c = self.ser.read().decode(errors="ignore")
 
-                elif c == '>' and self.receiving:
-                    self.receiving = False
+                        if c == '<':
+                            self.buffer = ""
+                            self.receiving = True
 
-                    msg_type = MSG_MAP.get(self.buffer, RxMsg.NONE) 
-                    print(f"[UART RX] {msg_type.value}")
-                    try:
-                        self.rx_queue.put_nowait(msg_type)
-                    except queue.Full:
-                        print("[UART] RX queue full")
+                        elif c == '>' and self.receiving:
+                            self.receiving = False
+                            msg_type = MSG_MAP.get(self.buffer, RxMsg.NONE) 
+                            self.ts_print(f"[UART RX] {msg_type.value}")
+                            try:
+                                self.rx_queue.put_nowait(msg_type)
+                            except queue.Full:
+                                pass # Silently drop or log
 
-                elif self.receiving:
-                    self.buffer += c
+                        elif self.receiving:
+                            self.buffer += c
+                            if len(self.buffer) > 32:
+                                self.buffer = ""
+                                self.receiving = False
 
-                    # overflow protection
-                    if len(self.buffer) > 32:
-                        self.buffer = ""
-                        self.receiving = False
+                except Exception as e:
+                    # This prevents the thread from dying if the port glitches
+                    # or is closed momentarily during cleanup
+                    if self.running:
+                        self.ts_print(f"[UART] RX Thread Error: {e}")
+                    time.sleep(0.1)
 
-            time.sleep(0.01)
+                time.sleep(0.01)
 
     def get_message(self) -> RxMsg:
         try:
@@ -150,7 +165,7 @@ def main():
     uart = UARTHandler()
     uart.start()
 
-    print("UART started. Type messages or press Ctrl+C to exit.")
+    uart.ts_print("UART started. Type messages or press Ctrl+C to exit.")
 
     last_send = time.time()
 
@@ -170,7 +185,7 @@ def main():
             time.sleep(0.1)
 
     except KeyboardInterrupt:
-        print("Stopping...")
+        uart.ts_print("Stopping...")
         uart.stop()
 
 

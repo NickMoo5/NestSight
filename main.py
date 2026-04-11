@@ -17,7 +17,7 @@ class mainProcess:
         self.qcm = Qcm()
         self.uart = UARTHandler()
         self.uart.start()
-        self.operation_mode = None
+        self.operation_mode = opMode.IDLE
         self.running = False
         self.skip_mode_on = False
 
@@ -33,9 +33,10 @@ class mainProcess:
             while True:
                 msg = self.uart.get_message()
 
-                time.sleep(0.05)
+                # Safe display value for logging (handles None)
+                msg_val = msg.value if msg is not None else None
 
-                if msg == RxMsg.CLEANUP and not self.running:
+                if msg == RxMsg.CLEANUP:
                     print("[SYS] Cleaning system up")
                     self.operation_mode = opMode.IDLE
                     self.qcm.turntableHome()
@@ -57,13 +58,16 @@ class mainProcess:
                         self.qcm.open_shutter()
                         self.uart.send(TxMsg.SET)
                     else:
-                        print(f"ERROR: received unintended msg: {msg.value}")
+                        print(f"ERROR: received unintended msg: {msg_val}")
                 # =======================
                 # HANDLE COMMANDS
                 # =======================
                 elif self.operation_mode == opMode.NORMAL:
                     if not self.running:
-                        if msg == RxMsg.EVAL:
+                        # If there's no message, just wait for commands instead of treating as an error
+                        if msg is None:
+                            pass
+                        elif msg == RxMsg.EVAL:
                             print("[SYS] Starting evaluation")
                             self.running = True
                             result = self.qcm.evaluate_birdie()
@@ -75,7 +79,8 @@ class mainProcess:
                             else:
                                 self.uart.send(TxMsg.FAIL)
                         else:
-                            print(f"ERROR running: received unintended msg: {msg.value}")
+                            print(f"ERROR running: received unintended msg: {msg_val}")
+                            continue
                     elif self.running:
                         if msg == RxMsg.EJECT:
                             print("[SYS] Ejecting birdie")
@@ -83,16 +88,23 @@ class mainProcess:
                             self.running = False
                             self.uart.send(TxMsg.READY)
 
+                        elif msg is None:
+                            pass
                         else:
-                            print(f"ERROR running: received unintended msg: {msg.value}")
+                            print(f"ERROR running: received unintended msg: {msg_val}")
+                            continue
                 elif self.operation_mode == opMode.SKIP:
                     if not self.skip_mode_on:
                         self.qcm.open_shutter()
                         self.skip_mode_on = True
                         print("[SYS] SKIP mode activated. Opening Shutter")
+                    elif msg is None:
+                        pass
                     else:
-                        print(f"ERROR not running: received unintended msg: {msg.value}")
+                        print(f"ERROR not running: received unintended msg: {msg_val}")
+                        continue
 
+                time.sleep(0.05)
 
         except KeyboardInterrupt:
             print("Shutting down...")
@@ -103,13 +115,16 @@ class mainProcess:
 
 
 def main():
+    runProcess = None
     try:
         runProcess = mainProcess()
         runProcess.run()
-    except KeyboardInterrupt:
-        runProcess.clean()
+    except Exception as e:
+        print(f"Unexpected error: {e}")
     finally:
-        runProcess.clean()
+        if runProcess is not None:
+            runProcess.cleanup()
+        os.system("sudo pkill -9 python")
 
 
 # --- Execution ---
