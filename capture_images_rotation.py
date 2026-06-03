@@ -5,7 +5,7 @@ from turntable import Turntable
 import os
 from datetime import datetime
 
-DIR = "captures_8"
+DIR = "captures_16"
 
 def save_image(frame, dir):
     # 1. Create folder if it doesn't exist
@@ -50,8 +50,8 @@ def main():
     num_imgs = 0
 
     try:
-        while True:
-            if turntable.step(speed=0.001): break
+        # while True:
+        #     if turntable.step(speed=0.001): break
 
         while True:
             # Capture a frame as a numpy array

@@ -5,6 +5,15 @@ import cv2
 from qcm import Qcm
 from uart import UARTHandler, TxMsg, RxMsg
 from enum import Enum
+import signal
+
+def service_shutdown(signum, frame):
+    print(f"Caught signal {signum}, raising KeyboardInterrupt...")
+    raise KeyboardInterrupt
+
+# Register the signals
+signal.signal(signal.SIGTERM, service_shutdown)
+signal.signal(signal.SIGINT, service_shutdown)
 
 class opMode(Enum):
     NORMAL = "NORMAL"
@@ -41,6 +50,7 @@ class mainProcess:
                     self.operation_mode = opMode.IDLE
                     self.qcm.turntableHome()
                     self.qcm.turntableOff()
+                    self.running = False
 
                 if self.operation_mode == opMode.IDLE:
                     if msg is None:

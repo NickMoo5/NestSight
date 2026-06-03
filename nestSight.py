@@ -45,7 +45,7 @@ class NestSight:
         self.worker = threading.Thread(target=self.process_image_task, daemon=True)
 
         # Dev output
-        self.temp_dir = "temp_report_images"
+        self.temp_dir = "CAP_A"
         self.output_pdf = "NestSight_report.pdf"
 
         self.submitted_count = 0
@@ -195,18 +195,27 @@ class NestSight:
             self.fourier_result = f"DEFECT SUSPECTED (irregular structure, score={score:.2f})"
 
     def _classify(self):
+        # Determine final result and print a human-readable reason for debugging
         if self.max_gap > 25:
+            reason = f"Max gap too large: {self.max_gap:.2f}% (>25%)"
             self.final_result = "FAIL"
         elif self.avg_gap > 10:
+            reason = f"Average gap too large: {self.avg_gap:.2f}% (>10%)"
             self.final_result = "FAIL"
         elif self.high_gap_ratio > 20:
+            reason = f"High gap ratio: {self.high_gap_ratio:.1f}% (>20%)"
             self.final_result = "FAIL"
         elif len(self.spike_regions) > 0:
+            reason = f"Spike regions detected: {len(self.spike_regions)} region(s)"
             self.final_result = "FAIL"
-        elif self.fft_score > 5:
+        elif self.fft_score > 4:
+            reason = f"FFT score indicates PASS: {self.fft_score:.2f} (>4)"
             self.final_result = "PASS"
         else:
+            reason = f"No passing criteria met (fft_score={self.fft_score:.2f})"
             self.final_result = "FAIL"
+
+        print(f"[CLASSIFY] Final Result: {self.final_result} -- {reason}")
 
     # -----------------------------
     # DEV MODE RUN (DIRECTORY)
@@ -216,7 +225,7 @@ class NestSight:
 
         for i, f in enumerate(files):
             img = cv2.imread(os.path.join(input_dir, f))
-            cropped = img[100:300, 270:350]
+            cropped = img[90:300, 295:350]
             self.submit_image(cropped, i)
 
         while not self.all_images_processed():
@@ -533,11 +542,11 @@ def process_single_worker(data):
 
 def main():
     profiler = NestSight(developer_mode=True)
-    profiler.run_developer_mode("captures_5")
+    profiler.run_developer_mode("captures_16")
 
 if __name__ == "__main__":
     start = time.perf_counter()
     main()
     end = time.perf_counter()
 
-    print(f"Images processed in: {(end - start) * 1000:.2f} ms") 
+    print(f"Images processed in: {(end - start) * 1000:.2f} ms")

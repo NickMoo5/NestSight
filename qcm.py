@@ -8,6 +8,7 @@ from turntable import Turntable
 from picamera2 import Picamera2
 from nestSight import NestSight
 import cv2
+import capture_images_rotation
 
 NO_SHUTTER = True
 
@@ -17,7 +18,7 @@ class Qcm:
         self.shutter = Shutter()
         self.turntable = Turntable()
         self.camera = Picamera2()
-        self.nestSight = NestSight()
+        self.nestSight = NestSight(developer_mode=True)
         self.frame_idx = 0
         self._camera_config()
         self.nestSight.start()
@@ -40,18 +41,19 @@ class Qcm:
         self.close_shutter()
         while True:
             # Capture a frame as a numpy array
-            print("Capturing Frame")
+            # print("Capturing Frame")
             # frame = self.camera.capture_array()
             frame = self.latest_frame
             if frame is None:
                 continue
             # Picamera2 outputs RGB, OpenCV expects BGR
-            print("Submitting to queue")
-            cropped = frame[90:300, 270:350]
+            # print("Submitting to queue")
+            cropped = frame[85:300, 295:350]
+            capture_images_rotation.save_image(cropped, "CAPA")
             self.nestSight.submit_image(cropped, self.frame_idx)
             self.frame_idx = self.frame_idx + 1
 
-            if self.turntable.step(speed=0.001): 
+            if self.turntable.step(speed=0.002): 
                 print("Finished rotation")
                 break
 
@@ -60,6 +62,7 @@ class Qcm:
 
         self.nestSight.collect_results()
         result = self.nestSight.evaluate()
+        self.nestSight.generate_pdf_report()
 
         self.nestSight.reset()
         self.frame_idx = 0
@@ -94,6 +97,7 @@ class Qcm:
 
 def main():
     qcm = Qcm()
+    qcm.developer_mode = True
 
     try:
     
