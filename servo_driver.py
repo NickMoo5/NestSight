@@ -2,69 +2,93 @@ import time
 from gpiozero import Servo
 from gpiozero.pins.pigpio import PiGPIOFactory
 
-# --- CONFIGURATION ---
-# Miuzei servos typically operate on a pulse width of 500us (0.5ms) to 2500us (2.5ms).
-# Standard gpiozero defaults might restrict the range, so we define them precisely.
-MIN_PW = 0.5 / 1000  # 500 microseconds
-MAX_PW = 2.5 / 1000  # 2500 microseconds
-SERVO_PIN = 18       # GPIO pin number (Broadcom/BCM numbering)
 
-# Optional: Using pigpio factory eliminates hardware PWM jitter.
-# To use this, run 'sudo pigpiod' in your terminal first.
-try:
-    factory = PiGPIOFactory()
-    servo = Servo(SERVO_PIN, min_pulse_width=MIN_PW, max_pulse_width=MAX_PW, pin_factory=factory)
-    print("Using pigpio factory for jitter-free control.")
-except:
-    servo = Servo(SERVO_PIN, min_pulse_width=MIN_PW, max_pulse_width=MAX_PW)
-    print("Using default GPIO pin factory.")
+class ServoDriver:
+    """
+    Simple reusable servo driver with open/close actions.
 
-def move_servo():
-    try:
-        print("\n--- Starting Servo Demonstration ---")
-        
-        while True:
-            servo.max()
-            time.sleep(1)
-            servo.min()
-            time.sleep(1)
-        
-        '''
-        # 1. Move to Center (0)
-        print("Moving to Center...")
-        servo.mid()
-        time.sleep(1.5)
-        
-        # 2. Move to Minimum (-1 represents 0 degrees)
-        print("Moving to Minimum Position (0�)...")
-        servo.min()
-        time.sleep(1.5)
-        
-        # 3. Move to Maximum (1 represents 180 or 270 degrees depending on your model)
-        print("Moving to Maximum Position...")
-        servo.max()
-        time.sleep(1.5)
-        
-        # 4. Continuous Smooth Sweep
-        print("\nStarting continuous sweep. Press Ctrl+C to stop.")
-        while True:
-            # Sweep from min to max
-            for value in range(-100, 101, 2):
-                servo.value = value / 100.0
-                time.sleep(0.01)
-            
-            # Sweep from max to min
-            for value in range(100, -101, -2):
-                servo.value = value / 100.0
-                time.sleep(0.01)
-        '''
-                 
-    except KeyboardInterrupt:
-        print("\nProgram stopped by user.")
-    finally:
-        # Detach the servo to stop it from holding position/drawing power
-        servo.detach()
-        print("Servo detached safely.")
+    Assumes:
+    - "open"  -> servo max position
+    - "close" -> servo min position
 
-if __name__ == "__main__":
-    move_servo()
+    You can invert behavior by swapping open_value and close_value.
+    """
+
+    def __init__(
+        self,
+        pin: int = 18,
+        min_pulse_width: float = 0.5 / 1000,
+        max_pulse_width: float = 2.5 / 1000,
+        open_value: float = 1.0,
+        close_value: float = -1.0,
+        move_delay: float = 1.0,
+        use_pigpio: bool = True,
+    ):
+        self.pin = pin
+        self.open_value = open_value
+        self.close_value = close_value
+        self.move_delay = move_delay
+
+        self._factory = None
+        self._servo = None
+
+        if use_pigpio:
+            try:
+                self._factory = PiGPIOFactory()
+                self._servo = Servo(
+                    pin,
+                    min_pulse_width=min_pulse_width,
+                    max_pulse_width=max_pulse_width,
+                    pin_factory=self._factory,
+                )
+                print("Using pigpio factory for jitter-free control.")
+            except Exception:
+                self._servo = Servo(
+                    pin,
+                    min_pulse_width=min_pulse_width,
+                    max_pulse_width=max_pulse_width,
+                )
+                print("pigpio unavailable, using default GPIO factory.")
+        else:
+            self._servo = Servo(
+                pin,
+                min_pulse_width=min_pulse_width,
+                max_pulse_width=max_pulse_width,
+            )
+            print("Using default GPIO factory.")
+
+    def open(self):
+        """Move servo to open position."""
+        self._servo.value = self.open_value
+        time.sleep(self.move_delay)
+
+    def close(self):
+        """Move servo to closed position."""
+        self._servo.value = self.close_value
+        time.sleep(self.move_delay)
+
+    def set_position(self, value: float):
+        """
+        Set raw servo position from -1.0 to 1.0.
+        Useful for calibration.
+        """
+        if not -1.0 <= value <= 1.0:
+            raise ValueError("Servo value must be between -1.0 and 1.0")
+        self._servo.value = value
+
+    def detach(self):
+        """Detach servo so it stops holding position."""
+        self._servo.detach()
+
+    def cleanup(self):
+        """Safe cleanup helper."""
+        try:
+            self.detach()
+        except Exception:
+            pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.cleanup()

@@ -9,22 +9,25 @@ from picamera2 import Picamera2
 from nestSight import NestSight
 import cv2
 import capture_images_rotation
+from servo_driver import ServoDriver
 
 NO_SHUTTER = True
 
 class Qcm:
 
     def __init__(self):
-        self.shutter = Shutter()
+        #self.shutter = Shutter()
         self.turntable = Turntable()
         self.camera = Picamera2()
         self.nestSight = NestSight(developer_mode=True)
         self.frame_idx = 0
+        self.servo = ServoDriver(pin=18)
         self._camera_config()
         self.nestSight.start()
 
         self.latest_frame = None
-        self.close_shutter()
+        #self.close_shutter()
+        self.servo.close()
 
     def _camera_config(self):
         config = self.camera.create_preview_configuration(main={"format": 'BGR888', "size": (640, 480)})
@@ -38,7 +41,9 @@ class Qcm:
 
     def evaluate_birdie(self):
         print("Evaluating Birdie")
-        self.close_shutter()
+        #self.close_shutter()
+        self.servo.close()
+        self.turntable.enable()
         while True:
             # Capture a frame as a numpy array
             # print("Capturing Frame")
@@ -49,12 +54,13 @@ class Qcm:
             # Picamera2 outputs RGB, OpenCV expects BGR
             # print("Submitting to queue")
             cropped = frame[85:300, 295:350]
-            capture_images_rotation.save_image(cropped, "CAPA")
+            # capture_images_rotation.save_image(cropped, "CAPA")
             self.nestSight.submit_image(cropped, self.frame_idx)
             self.frame_idx = self.frame_idx + 1
 
-            if self.turntable.step(speed=0.002): 
+            if self.turntable.step(speed=0.0006): 
                 print("Finished rotation")
+                self.turntable.disable()
                 break
 
         while not self.nestSight.all_images_processed():
@@ -69,15 +75,17 @@ class Qcm:
         return result
     
     def drop(self):
-        self.shutter.open()
+        # self.shutter.open()
+        self.servo.open()
         time.sleep(1)
-        self.shutter.close()
+        # self.shutter.close()
+        self.servo.close()
 
     def open_shutter(self):
-        self.shutter.open()
+        self.servo.open()
 
     def close_shutter(self):
-        self.shutter.close()
+        self.servo.close()
 
     def turntableHome(self):
         self.turntable.returnHome()
@@ -92,7 +100,8 @@ class Qcm:
         self.nestSight.stop()
         # self.nestSight.shutdown_pool()
         self.turntable.cleanup()
-        self.shutter.cleanup()
+        # self.shutter.cleanup()
+        self.servo.cleanup()
         self.camera.stop()
 
 def main():
