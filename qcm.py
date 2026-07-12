@@ -10,6 +10,7 @@ from nestSight import NestSight
 import cv2
 import capture_images_rotation
 from servo_driver_hw import ServoDriverHW
+from camera import CROP_Y_START, CROP_Y_END, CROP_X_START, CROP_X_END
 
 NO_SHUTTER = True
 
@@ -50,7 +51,7 @@ class Qcm:
                 continue
             # Picamera2 outputs RGB, OpenCV expects BGR
             # print("Submitting to queue")
-            cropped = frame[85:300, 295:350]
+            cropped = frame[CROP_Y_START:CROP_Y_END, CROP_X_START:CROP_X_END]
             # capture_images_rotation.save_image(cropped, "CAPA")
             self.nestSight.submit_image(cropped, self.frame_idx)
             self.frame_idx = self.frame_idx + 1
@@ -82,7 +83,7 @@ class Qcm:
 
     def close_shutter(self):
         # Override driver close(): manually set to min
-        self.servo.move_to_value(-0.8)
+        self.servo.move_to_value(-0.9)
 
     def open_slide(self):
         self.slide.open()

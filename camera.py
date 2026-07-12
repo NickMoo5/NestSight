@@ -5,6 +5,12 @@ from picamera2 import Picamera2
 import os
 from datetime import datetime
 
+# --- Crop region (shared with qcm.py so alg and camera preview stay in sync) ---
+CROP_Y_START = 100
+CROP_Y_END   = 304
+CROP_X_START = 270
+CROP_X_END   = 335
+
 def save_image(frame):
     # Create a 'captures' folder if it doesn't exist
     if not os.path.exists("captures"):
@@ -19,38 +25,42 @@ def save_image(frame):
     print(f"--- Image saved to {filename} ---")
 
 # 1. Initialize Camera
-picam2 = Picamera2()
+def main():
+    picam2 = Picamera2()
 
-# 2. Configure for a standard resolution (easy on the VNC bandwidth)
-config = picam2.create_preview_configuration(main={"format": 'BGR888', "size": (640, 480)})
-picam2.configure(config)
+    # 2. Configure for a standard resolution (easy on the VNC bandwidth)
+    config = picam2.create_preview_configuration(main={"format": 'BGR888', "size": (640, 480)})
+    picam2.configure(config)
 
-# 3. Start the camera
-print("Starting camera... Press 'q' in the window to exit.")
-picam2.start()
+    # 3. Start the camera
+    print("Starting camera... Press 'q' in the window to exit.")
+    picam2.start()
 
-try:
-    while True:
-        # Capture a frame as a numpy array
-        frame = picam2.capture_array()
+    try:
+        while True:
+            # Capture a frame as a numpy array
+            frame = picam2.capture_array()
 
-        # Picamera2 outputs RGB, OpenCV expects BGR
-        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        img = frame_bgr[100:320, 270:350].copy()
-        # 4. Show the frame in a window
-        cv2.imshow("Raspberry Pi 5 Camera", img)
+            # Picamera2 outputs RGB, OpenCV expects BGR
+            frame_bgr = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            img = frame_bgr[CROP_Y_START:CROP_Y_END, CROP_X_START:CROP_X_END].copy()
+            # 4. Show the frame in a window
+            cv2.imshow("Raspberry Pi 5 Camera", img)
 
-        key = cv2.waitKey(1) & 0xFF
+            key = cv2.waitKey(1) & 0xFF
 
-        if key == 32:
-            save_image(frame_bgr)
+            if key == 32:
+                save_image(frame_bgr)
 
-        # Break loop on 'q' key press
-        if key == ord('q'):
-            break
+            # Break loop on 'q' key press
+            if key == ord('q'):
+                break
 
-finally:
-    # 5. Clean up
-    picam2.stop()
-    cv2.destroyAllWindows()
-    print("Camera stopped.")
+    finally:
+        # 5. Clean up
+        picam2.stop()
+        cv2.destroyAllWindows()
+        print("Camera stopped.")
+
+if __name__ == "__main__":
+    main()

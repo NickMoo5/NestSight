@@ -485,11 +485,16 @@ def process_single_worker(data):
     img_full, image_index = data
     img = cv2.cvtColor(img_full, cv2.COLOR_BGR2RGB)
 
-    # img = frame_bgr[100:295, 280:340].copy()
     h, w = img.shape[:2]
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    _, laser_mask = cv2.threshold(gray, 190, 255, cv2.THRESH_BINARY)
+    _, laser_mask = cv2.threshold(gray, 210, 255, cv2.THRESH_BINARY)
+
+    # Ignore the bottom-left corner: zero out that region of the mask so
+    # reflections/noise there never influence the line fit or gap math.
+    bl_h = int(h * 0.05)   # bottom 5% of rows
+    bl_w = int(w * 0.40)   # left 40% of columns
+    laser_mask[h - bl_h:, :bl_w] = 0
 
     kernel = np.ones((1, 1), np.uint8)
     skeleton = cv2.morphologyEx(laser_mask, cv2.MORPH_OPEN, kernel)
@@ -510,7 +515,7 @@ def process_single_worker(data):
     p2 = (int(x0 + vx * 500), int(y0 + vy * 500))
     cv2.line(math_line_mask, p1, p2, 255, 1)
 
-    kernel = np.ones((1, 20), np.uint8)
+    kernel = np.ones((1, 10), np.uint8)
     gate_mask = cv2.dilate(laser_mask, kernel)
 
     final = cv2.bitwise_and(math_line_mask, gate_mask)
