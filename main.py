@@ -3,8 +3,8 @@ import os
 from enum import Enum
 import cv2
 from qcm import Qcm
+from nestSight import BirdieState
 from uart import UARTHandler, TxMsg, RxMsg
-from enum import Enum
 import signal
 
 def service_shutdown(signum, frame):
@@ -15,109 +15,61 @@ def service_shutdown(signum, frame):
 signal.signal(signal.SIGTERM, service_shutdown)
 signal.signal(signal.SIGINT, service_shutdown)
 
-class opMode(Enum):
-    NORMAL = "NORMAL"
-    SKIP = "SKIP"
-    IDLE = "IDLE"
+POLL_INTERVAL = 1.0  # seconds between READY/occupancy polls
 
 class mainProcess:
 
     def __init__(self):
-        self.qcm = Qcm()
-        self.uart = UARTHandler()
-        self.uart.start()
-        self.operation_mode = opMode.IDLE
-        self.running = False
-        self.skip_mode_on = False
+        # Qcm init sets everything up, including closing the shutter
+        self.qcm = None
+        self.uart = None
+        try:
+            self.qcm = Qcm()
+            self.uart = UARTHandler()
+            self.uart.start()
+        except BaseException:
+            # Construction failed partway: release whatever exists so pool
+            # workers/GPIO/serial don't get stranded.
+            self.cleanup()
+            raise
 
     def cleanup(self):
-        self.qcm.cleanup()
-        self.uart.stop()
+        if self.qcm is not None:
+            self.qcm.cleanup()
+        if self.uart is not None:
+            try:
+                self.uart.stop()
+            except Exception as e:
+                print(f"[CLEANUP] uart.stop failed: {e}")
 
     def run(self):
         print("System Ready")
-        self.uart.send(TxMsg.READY)
 
         try:
             while True:
-                msg = self.uart.get_message()
+                # Transmit READY and keep checking for a birdie
+                self.uart.send(TxMsg.READY)
 
-                # Safe display value for logging (handles None)
-                msg_val = msg.value if msg is not None else None
+                state = self.qcm.check_occupancy()
+                if state != BirdieState.BIRDIE:
+                    time.sleep(POLL_INTERVAL)
+                    continue
 
-                if msg == RxMsg.CLEANUP:
-                    print("[SYS] Cleaning system up")
-                    self.operation_mode = opMode.IDLE
-                    self.qcm.turntableHome()
-                    self.qcm.turntableOff()
-                    self.running = False
+                # Birdie detected: announce and run the evaluation process
+                print("[SYS] Birdie detected! Starting evaluation")
+                self.uart.send(TxMsg.EVAL)
 
-                if self.operation_mode == opMode.IDLE:
-                    if msg is None:
-                        self.uart.send(TxMsg.READY)
-                    elif msg == RxMsg.N:
-                        print("[SYS] Setting Normal Operation Mode")
-                        self.operation_mode = opMode.NORMAL
-                        self.qcm.close_shutter()
-                        self.qcm.turntableOn()
-                        self.uart.send(TxMsg.SET)
+                self.qcm.run_evaluation()
 
-                    elif msg == RxMsg.S:
-                        print("[SYS] Setting Skip Operation Mode")
-                        self.operation_mode = opMode.SKIP
-                        self.qcm.open_shutter()
-                        self.uart.send(TxMsg.SET)
-                    else:
-                        print(f"ERROR: received unintended msg: {msg_val}")
-                # =======================
-                # HANDLE COMMANDS
-                # =======================
-                elif self.operation_mode == opMode.NORMAL:
-                    if not self.running:
-                        # If there's no message, just wait for commands instead of treating as an error
-                        if msg is None:
-                            pass
-                        elif msg == RxMsg.EVAL:
-                            print("[SYS] Starting evaluation")
-                            self.running = True
-                            result = self.qcm.evaluate_birdie()
-
-                            print(f"[SYS] Result: {result}")
-
-                            if result == "PASS":
-                                self.uart.send(TxMsg.PASS)
-                            else:
-                                self.uart.send(TxMsg.FAIL)
-                        else:
-                            print(f"ERROR running: received unintended msg: {msg_val}")
-                            continue
-                    elif self.running:
-                        if msg == RxMsg.EJECT:
-                            print("[SYS] Ejecting birdie")
-                            self.qcm.drop()
-                            self.running = False
-                            self.uart.send(TxMsg.READY)
-
-                        elif msg is None:
-                            pass
-                        else:
-                            print(f"ERROR running: received unintended msg: {msg_val}")
-                            continue
-                elif self.operation_mode == opMode.SKIP:
-                    if not self.skip_mode_on:
-                        self.qcm.open_shutter()
-                        self.skip_mode_on = True
-                        print("[SYS] SKIP mode activated. Opening Shutter")
-                    elif msg is None:
-                        pass
-                    else:
-                        print(f"ERROR not running: received unintended msg: {msg_val}")
-                        continue
-
-                time.sleep(0.05)
+                print("[SYS] Evaluation complete, returning to READY")
 
         except KeyboardInterrupt:
             print("Shutting down...")
+
+        except Exception:
+            # Print the real error BEFORE the finally's os._exit silences it
+            import traceback
+            traceback.print_exc()
 
         finally:
             self.cleanup()
@@ -132,9 +84,9 @@ def main():
     except Exception as e:
         print(f"Unexpected error: {e}")
     finally:
+        # Only reached if construction failed; run() exits the process itself.
         if runProcess is not None:
             runProcess.cleanup()
-        os.system("sudo pkill -9 python")
 
 
 # --- Execution ---

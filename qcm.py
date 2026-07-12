@@ -22,21 +22,33 @@ NO_SHUTTER = True
 
 class Qcm:
 
-    def __init__(self):
-        # NestSight FIRST: it forks a multiprocessing pool, and workers
-        # inherit all open fds. Creating it before any GPIO is claimed
-        # keeps workers from holding /dev/gpiochip* open after a crash.
-        self.nestSight = NestSight(developer_mode=True)
-        self.turntable = Turntable()
-        self.camera = Picamera2()
-        self.frame_idx = 0
-        self.servo = ServoDriverHW(pin=18)
-        self.slide = ServoDriverHW(pin=19)
-        self._camera_config()
-        self.nestSight.start()
+    def __init__(self, developer_mode=False):
+        self.developer_mode = developer_mode
+        self.nestSight = None
+        self.turntable = None
+        self.camera = None
+        self.servo = None
+        self.slide = None
+        try:
+            # NestSight FIRST: it forks a multiprocessing pool, and workers
+            # inherit all open fds. Creating it before any GPIO is claimed
+            # keeps workers from holding /dev/gpiochip* open after a crash.
+            self.nestSight = NestSight(developer_mode=developer_mode)
+            self.turntable = Turntable()
+            self.camera = Picamera2()
+            self.frame_idx = 0
+            self.servo = ServoDriverHW(pin=18)
+            self.slide = ServoDriverHW(pin=19)
+            self._camera_config()
+            self.nestSight.start()
 
-        self.latest_frame = None
-        self.close_shutter()
+            self.latest_frame = None
+            self.close_shutter()
+        except BaseException:
+            # Construction failed partway (error or Ctrl+C): release whatever
+            # was already created so pool workers/GPIO don't get stranded.
+            self.cleanup()
+            raise
 
     def _camera_config(self):
         config = self.camera.create_preview_configuration(main={"format": 'BGR888', "size": (640, 480)})
@@ -112,26 +124,44 @@ class Qcm:
     def close_slide(self):
         self.slide.close()
 
+    def run_evaluation(self):
+        """Full evaluation sequence: evaluate, sort via slide, and drop.
+        Returns the verdict string."""
+        result = self.evaluate_birdie()
+        print(f"VERDICT:    {result}")
+        if result != "PASS":
+            self.open_slide()
+        self.drop()
+        time.sleep(0.5)
+        self.close_slide()
+        time.sleep(0.2)
+        return result
+
     def cleanup(self):
-        # Run every step even if one fails, so GPIO always gets released.
-        for step in (
-            self.nestSight.stop,
-            self.nestSight.shutdown_pool,
-            self.turntable.cleanup,
-            self.servo.cleanup,
-            self.slide.cleanup,
-            self.camera.stop,
-        ):
+        # Tolerate partially-constructed state and run every step even if
+        # one fails, so pool workers and GPIO always get released.
+        steps = []
+        if self.nestSight is not None:
+            steps += [self.nestSight.stop, self.nestSight.shutdown_pool]
+        if self.turntable is not None:
+            steps.append(self.turntable.cleanup)
+        if self.servo is not None:
+            steps.append(self.servo.cleanup)
+        if self.slide is not None:
+            steps.append(self.slide.cleanup)
+        if self.camera is not None:
+            steps.append(self.camera.stop)
+        for step in steps:
             try:
                 step()
             except Exception as e:
                 print(f"[CLEANUP] {step.__qualname__} failed: {e}")
 
 def main():
-    qcm = Qcm()
-    qcm.developer_mode = True
-
+    qcm = None
     try:
+        qcm = Qcm(developer_mode=True)
+
         while True:
             state = qcm.check_occupancy()
 
@@ -141,22 +171,15 @@ def main():
                 continue
 
             print("Birdie detected! Evaluating Birdie")
-            result = qcm.evaluate_birdie()
-            print(f"VERDICT:    {result}")
-            if result != "PASS":
-                qcm.open_slide()
-            qcm.drop()
-            time.sleep(0.5)
-            qcm.close_slide()
-            time.sleep(0.2)
-            # qcm.slide.detach()
+            qcm.run_evaluation()
     except KeyboardInterrupt:
         print("Exiting...")
     except Exception:
         import traceback
         traceback.print_exc()
     finally:
-        qcm.cleanup()
+        if qcm is not None:
+            qcm.cleanup()
         os._exit(0)
 
 # --- Execution ---

@@ -482,17 +482,25 @@ class NestSight:
     def shutdown_pool(self):
         if self.pool is None:
             return
-        print(f"Active workers: {[p.is_alive() for p in self.pool._pool]}")
-
         print("[POOL] Shutting down...")
 
-        # self.pool.terminate()
+        workers = list(self.pool._pool)
 
-        for p in self.pool._pool:
+        # terminate() stops the pool's worker-maintenance thread (which would
+        # otherwise RESPAWN any worker we kill) and SIGTERMs the workers.
+        self.pool.terminate()
+
+        # Give workers a moment to exit, then force-kill any stragglers.
+        deadline = time.time() + 2.0
+        for p in workers:
+            p.join(max(0.0, deadline - time.time()))
+        for p in workers:
             if p.is_alive():
                 print(f"[POOL] Force killing {p.pid}")
                 p.kill()
-        # ⏳ wait a short time only
+
+        self.pool.join()
+        self.pool = None
         print("[POOL] Shutdown complete")
 
 # def shutdown_pool(self):
