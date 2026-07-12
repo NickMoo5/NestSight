@@ -5,6 +5,7 @@ import os
 import time
 
 FULL_REV = 360
+TURNTABLE_SPEED = 0.00025
 
 class Turntable:
 
@@ -27,7 +28,7 @@ class Turntable:
         
         # 15 pulses = ~1.985 degrees at the turntable surface
         self.pulses_per_move = 15
-        self.degrees_per_move = 4 
+        self.degrees_per_move = 2 
         
         self.config_file = config_file
         self.data = self._load_data()
@@ -126,7 +127,7 @@ def main():
     #     # turntable.stepRamped(final_speed=0.0004)
     #     turntable.step(speed=0.0006)
     while True:
-        if turntable.step(speed=0.0006): break
+        if turntable.step(speed=TURNTABLE_SPEED): break
 
     turntable.cleanup()
     # try:

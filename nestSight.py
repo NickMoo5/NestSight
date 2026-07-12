@@ -208,8 +208,8 @@ class NestSight:
         elif len(self.spike_regions) > 0:
             reason = f"Spike regions detected: {len(self.spike_regions)} region(s)"
             self.final_result = "FAIL"
-        elif self.fft_score > 4:
-            reason = f"FFT score indicates PASS: {self.fft_score:.2f} (>4)"
+        elif self.fft_score > 5:
+            reason = f"FFT score indicates PASS: {self.fft_score:.2f} (>5)"
             self.final_result = "PASS"
         else:
             reason = f"No passing criteria met (fft_score={self.fft_score:.2f})"

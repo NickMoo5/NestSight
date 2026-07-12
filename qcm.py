@@ -4,7 +4,7 @@ import os
 from enum import Enum
 import hardware_defines as hw
 from shutter import Shutter
-from turntable import Turntable
+from turntable import TURNTABLE_SPEED, Turntable
 from picamera2 import Picamera2
 from nestSight import NestSight
 import cv2
@@ -56,17 +56,19 @@ class Qcm:
             self.nestSight.submit_image(cropped, self.frame_idx)
             self.frame_idx = self.frame_idx + 1
 
-            if self.turntable.step(speed=0.0006): 
+            if self.turntable.step(speed=TURNTABLE_SPEED): 
                 print("Finished rotation")
                 self.turntable.disable()
                 break
 
         while not self.nestSight.all_images_processed():
             time.sleep(0.1)
+            print(f"Waiting for image processing to complete... {self.nestSight.processed_count()}/{self.frame_idx} processed.")
 
         self.nestSight.collect_results()
         result = self.nestSight.evaluate()
-        self.nestSight.generate_pdf_report()
+        if self.developer_mode:
+            self.nestSight.generate_pdf_report()
 
         self.nestSight.reset()
         self.frame_idx = 0
@@ -74,16 +76,16 @@ class Qcm:
     
     def drop(self):
         self.open_shutter()
-        time.sleep(0.4)
+        time.sleep(0.8)
         self.close_shutter()
 
     def open_shutter(self):
         # Override driver open(): manually set to max
-        self.servo.move_to_value(1.0)
+        self.servo.move_to_value(1.0, False)
 
     def close_shutter(self):
         # Override driver close(): manually set to min
-        self.servo.move_to_value(-0.9)
+        self.servo.move_to_value(-0.9, False)
 
     def open_slide(self):
         self.slide.open()
