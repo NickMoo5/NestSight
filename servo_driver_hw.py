@@ -75,11 +75,11 @@ class ServoDriverHW:
 
     def open(self):
         """Move servo to open position (100 degrees)."""
-        self.move_to_value(self.open_value)
+        self.move_to_value(self.open_value, settle=False)
 
     def close(self):
         """Move servo to closed position (165 degrees)."""
-        self.move_to_value(self.close_value)
+        self.move_to_value(self.close_value, settle=False)
 
     def detach(self):
         """Stop sending pulses so the servo stops holding position."""

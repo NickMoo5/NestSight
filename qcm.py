@@ -6,20 +6,29 @@ import hardware_defines as hw
 from shutter import Shutter
 from turntable import TURNTABLE_SPEED, Turntable
 from picamera2 import Picamera2
-from nestSight import NestSight
+from nestSight import NestSight, BirdieState
 import cv2
 import capture_images_rotation
 from servo_driver_hw import ServoDriverHW
 from camera import CROP_Y_START, CROP_Y_END, CROP_X_START, CROP_X_END
+from reference_images import (
+    CROP_Y_START as OCC_Y_START,
+    CROP_Y_END as OCC_Y_END,
+    CROP_X_START as OCC_X_START,
+    CROP_X_END as OCC_X_END,
+)
 
 NO_SHUTTER = True
 
 class Qcm:
 
     def __init__(self):
+        # NestSight FIRST: it forks a multiprocessing pool, and workers
+        # inherit all open fds. Creating it before any GPIO is claimed
+        # keeps workers from holding /dev/gpiochip* open after a crash.
+        self.nestSight = NestSight(developer_mode=True)
         self.turntable = Turntable()
         self.camera = Picamera2()
-        self.nestSight = NestSight(developer_mode=True)
         self.frame_idx = 0
         self.servo = ServoDriverHW(pin=18)
         self.slide = ServoDriverHW(pin=19)
@@ -67,17 +76,27 @@ class Qcm:
 
         self.nestSight.collect_results()
         result = self.nestSight.evaluate()
-        if self.developer_mode:
-            self.nestSight.generate_pdf_report()
+        # if self.developer_mode:
+        #     self.nestSight.generate_pdf_report()
 
         self.nestSight.reset()
         self.frame_idx = 0
         return result
     
+    def check_occupancy(self):
+        """Classify the latest frame as EMPTY, BIRDIE, or ERROR."""
+        frame = self.latest_frame
+        if frame is None:
+            return BirdieState.ERROR
+        cropped = frame[OCC_Y_START:OCC_Y_END, OCC_X_START:OCC_X_END]
+        return self.nestSight.detect_occupancy(cropped)
+
     def drop(self):
         self.open_shutter()
         time.sleep(0.8)
         self.close_shutter()
+        # time.sleep(0.5)
+        # self.servo.detach()
 
     def open_shutter(self):
         # Override driver open(): manually set to max
@@ -94,29 +113,43 @@ class Qcm:
         self.slide.close()
 
     def cleanup(self):
-        self.nestSight.stop()
-        # self.nestSight.shutdown_pool()
-        self.turntable.cleanup()
-        # self.shutter.cleanup()
-        self.servo.cleanup()
-        self.slide.cleanup()
-        self.camera.stop()
+        # Run every step even if one fails, so GPIO always gets released.
+        for step in (
+            self.nestSight.stop,
+            self.nestSight.shutdown_pool,
+            self.turntable.cleanup,
+            self.servo.cleanup,
+            self.slide.cleanup,
+            self.camera.stop,
+        ):
+            try:
+                step()
+            except Exception as e:
+                print(f"[CLEANUP] {step.__qualname__} failed: {e}")
 
 def main():
     qcm = Qcm()
     qcm.developer_mode = True
 
     try:
-    
-        print("Evaluating Birdie")
+        while True:
+            state = qcm.check_occupancy()
 
-        result = qcm.evaluate_birdie()
-        print(f"VERDICT:    {result}")
-        if result != "PASS":
-            qcm.open_slide()
-        qcm.drop()
-        time.sleep(0.6)
-        qcm.close_slide()
+            if state != BirdieState.BIRDIE:
+                print(f"No birdie detected ({state.name}), checking again in 4s...")
+                time.sleep(4)
+                continue
+
+            print("Birdie detected! Evaluating Birdie")
+            result = qcm.evaluate_birdie()
+            print(f"VERDICT:    {result}")
+            if result != "PASS":
+                qcm.open_slide()
+            qcm.drop()
+            time.sleep(0.5)
+            qcm.close_slide()
+            time.sleep(0.2)
+            # qcm.slide.detach()
     except KeyboardInterrupt:
         print("Exiting...")
     except Exception:

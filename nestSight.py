@@ -15,6 +15,10 @@ import matplotlib.pyplot as plt
 import multiprocessing as mp
 from enum import Enum
 
+def _worker_init():
+    """Pool workers ignore Ctrl+C; the parent shuts them down deliberately."""
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
 # -----------------------------
 # OCCUPANCY DETECTION (shared with reference_images.py)
 # -----------------------------
@@ -69,7 +73,7 @@ class NestSight:
         self.submitted_count = 0
         self.process_count = 0
 
-        self.pool = mp.Pool(processes=mp.cpu_count())
+        self.pool = mp.Pool(processes=mp.cpu_count(), initializer=_worker_init)
         self.pending_results = []   
 
         # Occupancy detection references: load once at startup so the

@@ -5,7 +5,8 @@ import os
 import time
 
 FULL_REV = 360
-TURNTABLE_SPEED = 0.00025
+TURNTABLE_SPEED = 0.00021
+# 0.00025
 
 class Turntable:
 
