@@ -7,9 +7,9 @@ class ServoDriver:
     """
     Simple reusable servo driver with open/close actions.
 
-    Assumes:
-    - "open"  -> servo max position
-    - "close" -> servo min position
+    Defaults are tuned for the slide positions:
+    - "open"  -> 100 degrees
+    - "close" -> 165 degrees
 
     You can invert behavior by swapping open_value and close_value.
     """
@@ -19,10 +19,10 @@ class ServoDriver:
         pin: int = 18,
         min_pulse_width: float = 0.5 / 1000,
         max_pulse_width: float = 2.5 / 1000,
-        open_value: float = 1.0,
-        close_value: float = -1.0,
+        open_value: float = 0.1111111111111111,  # 100 degrees
+        close_value: float = 0.8333333333333334,  # 165 degrees
         move_delay: float = 1.0,
-        use_pigpio: bool = True,
+        use_pigpio: bool = False,  # pigpio does not support the Pi 5; use default lgpio backend
     ):
         self.pin = pin
         self.open_value = open_value
@@ -76,6 +76,21 @@ class ServoDriver:
             raise ValueError("Servo value must be between -1.0 and 1.0")
         self._servo.value = value
 
+    def move_to_value(self, value: float, settle: bool = True):
+        """
+        Move servo to a specific raw position from -1.0 to 1.0.
+
+        Args:
+            value: Target servo value in the range [-1.0, 1.0].
+            settle: If True, waits move_delay after commanding the move.
+        """
+        if not -1.0 <= value <= 1.0:
+            raise ValueError("Servo value must be between -1.0 and 1.0")
+
+        self._servo.value = value
+        if settle:
+            time.sleep(self.move_delay)
+
     def detach(self):
         """Detach servo so it stops holding position."""
         self._servo.detach()
@@ -92,3 +107,29 @@ class ServoDriver:
 
     def __exit__(self, exc_type, exc, tb):
         self.cleanup()
+
+
+def main():
+    """Quick test loop that alternates between 100deg and 165deg."""
+    driver = ServoDriver(pin=13)
+    open_angle_value = 0.3   # 100 degrees
+    close_angle_value = 0.9  # 165 degrees
+    print("Starting servo angle test (100deg <-> 165deg). Press Ctrl+C to stop.")
+
+    try:
+    
+        print("Moving to 100deg (open)...")
+        driver.move_to_value(open_angle_value)
+        time.sleep(0.5)
+
+        print("Moving to 165deg (closed)...")
+        driver.move_to_value(close_angle_value)
+        time.sleep(0.5)
+    except KeyboardInterrupt:
+        print("\nStopping servo test.")
+    finally:
+        driver.cleanup()
+
+
+if __name__ == "__main__":
+    main()

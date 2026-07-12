@@ -9,25 +9,24 @@ from picamera2 import Picamera2
 from nestSight import NestSight
 import cv2
 import capture_images_rotation
-from servo_driver import ServoDriver
+from servo_driver_hw import ServoDriverHW
 
 NO_SHUTTER = True
 
 class Qcm:
 
     def __init__(self):
-        #self.shutter = Shutter()
         self.turntable = Turntable()
         self.camera = Picamera2()
         self.nestSight = NestSight(developer_mode=True)
         self.frame_idx = 0
-        self.servo = ServoDriver(pin=18)
+        self.servo = ServoDriverHW(pin=18)
+        self.slide = ServoDriverHW(pin=19)
         self._camera_config()
         self.nestSight.start()
 
         self.latest_frame = None
-        #self.close_shutter()
-        self.servo.close()
+        self.close_shutter()
 
     def _camera_config(self):
         config = self.camera.create_preview_configuration(main={"format": 'BGR888', "size": (640, 480)})
@@ -41,8 +40,6 @@ class Qcm:
 
     def evaluate_birdie(self):
         print("Evaluating Birdie")
-        #self.close_shutter()
-        self.servo.close()
         self.turntable.enable()
         while True:
             # Capture a frame as a numpy array
@@ -75,26 +72,23 @@ class Qcm:
         return result
     
     def drop(self):
-        # self.shutter.open()
-        self.servo.open()
-        time.sleep(1)
-        # self.shutter.close()
-        self.servo.close()
+        self.open_shutter()
+        time.sleep(0.4)
+        self.close_shutter()
 
     def open_shutter(self):
-        self.servo.open()
+        # Override driver open(): manually set to max
+        self.servo.move_to_value(1.0)
 
     def close_shutter(self):
-        self.servo.close()
+        # Override driver close(): manually set to min
+        self.servo.move_to_value(-0.8)
 
-    def turntableHome(self):
-        self.turntable.returnHome()
+    def open_slide(self):
+        self.slide.open()
 
-    def turntableOn(self):
-        self.turntable.enable()
-
-    def turntableOff(self):
-        self.turntable.disable()
+    def close_slide(self):
+        self.slide.close()
 
     def cleanup(self):
         self.nestSight.stop()
@@ -102,6 +96,7 @@ class Qcm:
         self.turntable.cleanup()
         # self.shutter.cleanup()
         self.servo.cleanup()
+        self.slide.cleanup()
         self.camera.stop()
 
 def main():
@@ -114,9 +109,16 @@ def main():
 
         result = qcm.evaluate_birdie()
         print(f"VERDICT:    {result}")
+        if result != "PASS":
+            qcm.open_slide()
         qcm.drop()
+        time.sleep(0.6)
+        qcm.close_slide()
     except KeyboardInterrupt:
         print("Exiting...")
+    except Exception:
+        import traceback
+        traceback.print_exc()
     finally:
         qcm.cleanup()
         os._exit(0)
