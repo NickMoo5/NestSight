@@ -20,7 +20,8 @@ class ServoDriver:
         min_pulse_width: float = 0.5 / 1000,
         max_pulse_width: float = 2.5 / 1000,
         open_value: float = 0.1111111111111111,  # 100 degrees
-        close_value: float = 0.8333333333333334,  # 165 degrees
+        # close_value: float = 0.8333333333333334,  # 165 degrees
+        close_value: float = 0.85,
         move_delay: float = 1.0,
         use_pigpio: bool = False,  # pigpio does not support the Pi 5; use default lgpio backend
     ):
@@ -111,9 +112,12 @@ class ServoDriver:
 
 def main():
     """Quick test loop that alternates between 100deg and 165deg."""
-    driver = ServoDriver(pin=13)
-    open_angle_value = 0.3   # 100 degrees
-    close_angle_value = 0.9  # 165 degrees
+    driver = ServoDriver(pin=19)
+    open_angle_value = -0.5   # 100 degrees
+    close_angle_value = -1  # 165 degrees
+    # driver = ServoDriver(pin=18)
+    # open_angle_value = 1.0  # 100 degrees
+    # close_angle_value = -0.9  # 165 degrees
     print("Starting servo angle test (100deg <-> 165deg). Press Ctrl+C to stop.")
 
     try:

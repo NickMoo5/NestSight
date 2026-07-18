@@ -27,9 +27,9 @@ REF_EMPTY_PATH = os.path.join(REFERENCE_DIR, "ref_empty.png")
 REF_BIRDIE_PATH = os.path.join(REFERENCE_DIR, "ref_birdie.png")
 
 # Gaussian blur kernel: smooths out per-birdie wear/tear differences
-OCCUPANCY_BLUR_KERNEL = (21, 21)
+OCCUPANCY_BLUR_KERNEL = (41, 41)
 # Mean abs pixel difference below this counts as a match to a reference
-OCCUPANCY_MATCH_THRESHOLD = 25.0
+OCCUPANCY_MATCH_THRESHOLD = 35.0
 
 class BirdieState(Enum):
     EMPTY = 0

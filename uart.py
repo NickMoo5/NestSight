@@ -20,6 +20,7 @@ class RxMsg(Enum):
     N     = "N"
     S     = "S"
     CLEANUP = "CLEANUP"
+    FAULT = "FAULT"
     NONE  = ""
 
 class TxMsg(Enum):
@@ -42,6 +43,7 @@ MSG_MAP = {
     "N"    : RxMsg.N,
     "S"    : RxMsg.S,
     "CLEANUP" : RxMsg.CLEANUP,
+    "FAULT" : RxMsg.FAULT,
     "NONE" : RxMsg.NONE
 }
 
@@ -86,9 +88,9 @@ class UARTHandler:
     # =======================
     # SEND (PUBLIC)
     # =======================
-    def send(self, msg_type: TxMsg):
+    def send(self, msg_type: TxMsg, log: bool = True):
         try:
-            self.tx_queue.put_nowait(msg_type.value)
+            self.tx_queue.put_nowait((msg_type.value, log))
         except queue.Full:
             self.ts_print("[UART] TX queue full")
 
@@ -98,12 +100,13 @@ class UARTHandler:
     def _tx_worker(self):
         while self.running:
             try:
-                msg_type = self.tx_queue.get(timeout=0.1)
+                msg_type, log = self.tx_queue.get(timeout=0.1)
                 msg = self._format_message(msg_type)
 
                 self.ser.write((msg + "\n").encode())
 
-                self.ts_print(f"[UART TX] {msg}")
+                if log:
+                    self.ts_print(f"[UART TX] {msg}")
 
             except queue.Empty:
                 continue

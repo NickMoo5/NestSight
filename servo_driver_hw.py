@@ -27,8 +27,10 @@ class ServoDriverHW:
         pin: int = 18,
         min_pulse_width: float = 0.5 / 1000,   # seconds, maps to value -1.0
         max_pulse_width: float = 2.5 / 1000,   # seconds, maps to value +1.0
-        open_value: float = 0.25,  # 100 degrees
-        close_value: float = 0.79,  # 165 degrees
+        # open_value: float = 0.25,  # 100 degrees
+        # close_value: float = 0.79,  # 165 degrees
+        open_value: float = 0.5,  # 100 degrees
+        close_value: float = 0.9,  # 165 degrees
         move_delay: float = 1.0,
         frequency: int = 50,
     ):
@@ -108,11 +110,12 @@ def main():
         while True:
             print("Moving to 100deg (open)...")
             driver.open()
-            time.sleep(0.5)
+            time.sleep(1)
 
             print("Moving to 165deg (closed)...")
             driver.close()
-            time.sleep(0.5)
+            # driver.move_to_value(0.9, settle=False)
+            time.sleep(1)
     except KeyboardInterrupt:
         print("\nStopping servo test.")
     finally:

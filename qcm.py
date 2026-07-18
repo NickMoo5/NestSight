@@ -131,10 +131,15 @@ class Qcm:
         print(f"VERDICT:    {result}")
         if result != "PASS":
             self.open_slide()
+        else:
+            self.close_slide()
+            time.sleep(0.5)
         self.drop()
         time.sleep(0.5)
         self.close_slide()
-        time.sleep(0.2)
+        time.sleep(0.5)
+        self.servo.detach()
+        self.slide.detach()
         return result
 
     def cleanup(self):
