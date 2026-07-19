@@ -263,7 +263,7 @@ class NestSight:
         self.fft_score = score
 
         # Classify result
-        if score > 5:
+        if score > 6:
             self.fourier_result = f"GOOD (strong periodic structure, score={score:.2f})"
         elif score > 1.8:
             self.fourier_result = f"BORDERLINE (minor irregularities, score={score:.2f})"
@@ -284,8 +284,8 @@ class NestSight:
         elif len(self.spike_regions) > 0:
             reason = f"Spike regions detected: {len(self.spike_regions)} region(s)"
             self.final_result = "FAIL"
-        elif self.fft_score > 5:
-            reason = f"FFT score indicates PASS: {self.fft_score:.2f} (>5)"
+        elif self.fft_score > 6:
+            reason = f"FFT score indicates PASS: {self.fft_score:.2f} (>6)"
             self.final_result = "PASS"
         else:
             reason = f"No passing criteria met (fft_score={self.fft_score:.2f})"

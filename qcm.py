@@ -2,6 +2,7 @@ import time
 import json
 import os
 from enum import Enum
+import lgpio
 import hardware_defines as hw
 from shutter import Shutter
 from turntable import TURNTABLE_SPEED, Turntable
@@ -29,6 +30,7 @@ class Qcm:
         self.camera = None
         self.servo = None
         self.slide = None
+        self._gpio_h = None
         try:
             # NestSight FIRST: it forks a multiprocessing pool, and workers
             # inherit all open fds. Creating it before any GPIO is claimed
@@ -41,6 +43,11 @@ class Qcm:
             self.slide = ServoDriverHW(pin=19)
             self._camera_config()
             self.nestSight.start()
+
+            # QCM enable switch (not wired yet if pin is None)
+            if hw.QCM_ENABLE_SWITCH is not None:
+                self._gpio_h = lgpio.gpiochip_open(0)
+                lgpio.gpio_claim_input(self._gpio_h, hw.QCM_ENABLE_SWITCH, lgpio.SET_PULL_UP)
 
             self.latest_frame = None
             self.close_shutter()
@@ -95,6 +102,15 @@ class Qcm:
         self.frame_idx = 0
         return result
     
+    def is_enabled(self):
+        """Read the QCM enable switch. Always enabled until the switch pin
+        is wired up (hw.QCM_ENABLE_SWITCH = None)."""
+        if self._gpio_h is None:
+            return True
+        # Pulled up: switch open = 1 = enabled, closed to GND = 0 = disabled.
+        # Flip the comparison if the switch is wired the other way.
+        return lgpio.gpio_read(self._gpio_h, hw.QCM_ENABLE_SWITCH) == 1
+
     def check_occupancy(self):
         """Classify the latest frame as EMPTY, BIRDIE, or ERROR."""
         frame = self.latest_frame
@@ -134,13 +150,19 @@ class Qcm:
         else:
             self.close_slide()
             time.sleep(0.5)
-        self.drop()
-        time.sleep(0.5)
+        # self.drop()
+        self.open_shutter()
+        time.sleep(0.8)
+        self.close_shutter()
         self.close_slide()
-        time.sleep(0.5)
+        time.sleep(1)
         self.servo.detach()
         self.slide.detach()
         return result
+
+    def _release_enable_switch(self):
+        lgpio.gpio_free(self._gpio_h, hw.QCM_ENABLE_SWITCH)
+        lgpio.gpiochip_close(self._gpio_h)
 
     def cleanup(self):
         # Tolerate partially-constructed state and run every step even if
@@ -156,6 +178,8 @@ class Qcm:
             steps.append(self.slide.cleanup)
         if self.camera is not None:
             steps.append(self.camera.stop)
+        if self._gpio_h is not None:
+            steps.append(self._release_enable_switch)
         for step in steps:
             try:
                 step()

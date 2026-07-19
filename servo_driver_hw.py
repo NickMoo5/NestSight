@@ -110,12 +110,12 @@ def main():
         while True:
             print("Moving to 100deg (open)...")
             driver.open()
-            time.sleep(1)
+            time.sleep(2)
 
             print("Moving to 165deg (closed)...")
             driver.close()
             # driver.move_to_value(0.9, settle=False)
-            time.sleep(1)
+            time.sleep(2)
     except KeyboardInterrupt:
         print("\nStopping servo test.")
     finally:

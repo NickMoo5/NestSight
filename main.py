@@ -8,6 +8,7 @@ from uart import UARTHandler, TxMsg, RxMsg
 import signal
 
 READY_LOG_INTERVAL = 5  # only log every Nth READY message to keep logs readable
+POLL_INTERVAL = 0.2  # seconds between READY/occupancy polls
 
 def service_shutdown(signum, frame):
     print(f"Caught signal {signum}, raising KeyboardInterrupt...")
@@ -54,6 +55,7 @@ class mainProcess:
     def run(self):
         print("System Ready")
         ready_count = 0
+        qcm_enabled = True  # Qcm starts enabled with the shutter closed
 
         try:
             while True:
@@ -62,13 +64,33 @@ class mainProcess:
                     print("[SYS] FAULT received! System halted, Ctrl+C to shut down")
                     while True:
                         time.sleep(1)
+                        print("[SYS] System halted, Ctrl+C to shut down")
+
+                # QCM enable switch: when disabled, keep sending READY but
+                # skip evaluation and leave the shutter open
+                enabled = self.qcm.is_enabled()
+                if enabled != qcm_enabled:
+                    qcm_enabled = enabled
+                    if enabled:
+                        print("[SYS] QCM enabled, closing shutter and resuming evaluation")
+                        self.qcm.close_shutter()
+                        time.sleep(0.8)
+                    else:
+                        print("[SYS] QCM disabled, opening shutter and pausing evaluation")
+                        self.qcm.open_shutter()
+                        time.sleep(0.8)
 
                 # Transmit READY and keep checking for a birdie
                 ready_count += 1
                 self.uart.send(TxMsg.READY, log=(ready_count % READY_LOG_INTERVAL == 0))
 
+                if not qcm_enabled:
+                    time.sleep(POLL_INTERVAL)
+                    continue
+
                 state = self.qcm.check_occupancy()
                 if state != BirdieState.BIRDIE:
+                    time.sleep(POLL_INTERVAL)
                     continue
 
                 # Birdie detected: announce and run the evaluation process
