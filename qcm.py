@@ -7,7 +7,7 @@ import hardware_defines as hw
 from shutter import Shutter
 from turntable import TURNTABLE_SPEED, Turntable
 from picamera2 import Picamera2
-from nestSight import NestSight, BirdieState
+from nestSight import NestSight
 import cv2
 import capture_images_rotation
 from servo_driver_hw import ServoDriverHW
@@ -95,8 +95,8 @@ class Qcm:
 
         self.nestSight.collect_results()
         result = self.nestSight.evaluate()
-        # if self.developer_mode:
-        #     self.nestSight.generate_pdf_report()
+        if self.developer_mode:
+            self.nestSight.generate_pdf_report()
 
         self.nestSight.reset()
         self.frame_idx = 0
@@ -112,10 +112,10 @@ class Qcm:
         return lgpio.gpio_read(self._gpio_h, hw.QCM_ENABLE_SWITCH) == 1
 
     def check_occupancy(self):
-        """Classify the latest frame as EMPTY, BIRDIE, or ERROR."""
+        """Return True if a birdie is detected in the latest frame."""
         frame = self.latest_frame
         if frame is None:
-            return BirdieState.ERROR
+            return False
         cropped = frame[OCC_Y_START:OCC_Y_END, OCC_X_START:OCC_X_END]
         return self.nestSight.detect_occupancy(cropped)
 
@@ -194,13 +194,14 @@ def main():
         while True:
             state = qcm.check_occupancy()
 
-            if state != BirdieState.BIRDIE:
-                print(f"No birdie detected ({state.name}), checking again in 4s...")
+            if not state:
+                print("No birdie detected, checking again in 4s...")
                 time.sleep(4)
-                continue
+            else:
+                break
 
-            print("Birdie detected! Evaluating Birdie")
-            qcm.run_evaluation()
+        print("Birdie detected! Evaluating Birdie")
+        qcm.run_evaluation()
     except KeyboardInterrupt:
         print("Exiting...")
     except Exception:

@@ -3,7 +3,6 @@ import os
 from enum import Enum
 import cv2
 from qcm import Qcm
-from nestSight import BirdieState
 from uart import UARTHandler, TxMsg, RxMsg
 import signal
 
@@ -89,13 +88,13 @@ class mainProcess:
                     continue
 
                 state = self.qcm.check_occupancy()
-                if state != BirdieState.BIRDIE:
+                if not state:
                     time.sleep(POLL_INTERVAL)
                     continue
 
                 # Birdie detected: announce and run the evaluation process
                 print("[SYS] Birdie detected! Starting evaluation")
-
+                time.sleep(0.5)  # give the birdie a moment to settle before evaluation
                 self.qcm.run_evaluation()
 
                 print("[SYS] Evaluation complete, returning to READY")
