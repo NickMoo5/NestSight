@@ -116,6 +116,7 @@ class mainProcess:
                 print("[SYS] Birdie detected! Starting evaluation")
                 time.sleep(0.5)  # give the birdie a moment to settle before evaluation
                 self.qcm.run_evaluation()
+                time.sleep(0.7)  # give the birdie a moment to leave before resuming READY
 
                 print("[SYS] Evaluation complete, returning to READY")
 
