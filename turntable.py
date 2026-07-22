@@ -1,7 +1,5 @@
 import hardware_defines as hw
 from stepper_motor_driver import StepperDriver, Direction
-import json
-import os
 import time
 
 FULL_REV = 360
@@ -10,7 +8,7 @@ TURNTABLE_SPEED = 0.00021
 
 class Turntable:
 
-    def __init__(self, gear_ratio=3.39, config_file="turntable_state.json"):
+    def __init__(self, gear_ratio=3.39):
         # Initialize Motor 1 from hardware_defines
         self.motor = StepperDriver(
             step_pin=hw.M1_STEP,
@@ -31,31 +29,15 @@ class Turntable:
         self.pulses_per_move = 15
         self.degrees_per_move = 2 
         
-        self.config_file = config_file
-        self.data = self._load_data()
+        self.data = {"pos": 0, "dir": "CW"}
         self._ramp_progress = 0  # tracks how many ramped steps taken since the last reset
-        print(f"Turntable System Online. Current Position: {self.data['pos']} Direction: {self.data["dir"]}")
+        print(f"Turntable System Online. Current Position: {self.data['pos']} Direction: {self.data['dir']}")
 
     def enable(self):
         self.motor.enable()
 
     def disable(self):
         self.motor.disable()
-
-    def _load_data(self):
-        """Loads position and direction from turntable_state.json"""
-        if os.path.exists(self.config_file):
-            try:
-                with open(self.config_file, 'r') as f:
-                    return json.load(f)
-            except: 
-                pass
-        return {"pos": 0, "dir": "CW"}
-
-    def _save_data(self):
-        """Saves position and direction to turntable_state.json"""
-        with open(self.config_file, 'w') as f:
-            json.dump(self.data, f)
 
     def step(self, speed=0.001):
         """Rotates the turntable ~2 degrees CW and wraps back to 0° at 360°."""
@@ -71,8 +53,6 @@ class Turntable:
             self.data["pos"] = 0
             print("--- Turntable reached 360° limit: Wrapping to 0° ---")
             change_direction = True
-
-        self._save_data()
 
         return change_direction
 

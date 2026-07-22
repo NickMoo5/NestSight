@@ -1,5 +1,6 @@
 import time
 import os
+import socket
 from enum import Enum
 import cv2
 from qcm import Qcm
@@ -8,6 +9,20 @@ import signal
 
 READY_LOG_INTERVAL = 5  # only log every Nth READY message to keep logs readable
 POLL_INTERVAL = 0.2  # seconds between READY/occupancy polls
+
+def sd_notify(msg):
+    """Send a notification to systemd (no-op when not run under systemd)."""
+    addr = os.environ.get("NOTIFY_SOCKET")
+    if not addr:
+        return
+    if addr.startswith("@"):
+        addr = "\0" + addr[1:]
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as s:
+            s.connect(addr)
+            s.sendall(msg.encode())
+    except OSError:
+        pass
 
 def service_shutdown(signum, frame):
     print(f"Caught signal {signum}, raising KeyboardInterrupt...")
@@ -53,17 +68,22 @@ class mainProcess:
 
     def run(self):
         print("System Ready")
+        sd_notify("READY=1")  # init done, systemd can consider us started
         ready_count = 0
         qcm_enabled = True  # Qcm starts enabled with the shutter closed
 
         try:
             while True:
+                # Pet the systemd watchdog: proves the main loop is alive
+                sd_notify("WATCHDOG=1")
+
                 # Halt if a FAULT came in (including during a just-finished eval)
                 if self._fault_received():
                     print("[SYS] FAULT received! System halted, Ctrl+C to shut down")
                     while True:
                         time.sleep(1)
                         print("[SYS] System halted, Ctrl+C to shut down")
+                        sd_notify("WATCHDOG=1")  # intentionally halted, not hung
 
                 # QCM enable switch: when disabled, keep sending READY but
                 # skip evaluation and leave the shutter open

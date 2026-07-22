@@ -1,6 +1,4 @@
 import time
-import json
-import os
 from enum import Enum
 import hardware_defines as hw
 from stepper_motor_driver import StepperDriver, Direction
@@ -13,7 +11,7 @@ class Shutter:
 
     SPEED = 0.0003
 
-    def __init__(self, steps_to_move=630, config_file="shutter_state.json"):
+    def __init__(self, steps_to_move=630):
         # Initialize the shared driver using our specific Hardware Defines
         self.motor = StepperDriver(
             step_pin=hw.M1_STEP,
@@ -26,21 +24,8 @@ class Shutter:
         self.motor.set_microstepping(0, 1, 0)
         
         self.steps_to_move = steps_to_move
-        self.config_file = config_file
-        self.state = self._load_state()
-        print(f"Shutter Online. Last known state: {self.state.name}")
-
-    def _load_state(self):
-        if os.path.exists(self.config_file):
-            try:
-                with open(self.config_file, 'r') as f:
-                    return ShutterState(json.load(f).get("state", 0))
-            except: pass
-        return ShutterState.CLOSED
-
-    def _save_state(self):
-        with open(self.config_file, 'w') as f:
-            json.dump({"state": self.state.value}, f)
+        self.state = ShutterState.CLOSED
+        print(f"Shutter Online. Assumed state: {self.state.name}")
 
     def open(self, speed=SPEED):
         if self.state == ShutterState.OPEN:
@@ -53,7 +38,6 @@ class Shutter:
         self.motor.move(self.steps_to_move, Direction.CCW, speed)
         self.motor.disable()
         self.state = ShutterState.OPEN
-        self._save_state()
 
     def close(self, speed=SPEED):
         if self.state == ShutterState.CLOSED:
@@ -65,7 +49,6 @@ class Shutter:
         self.motor.move(self.steps_to_move, Direction.CW, speed)
         self.motor.disable()
         self.state = ShutterState.CLOSED
-        self._save_state()
 
     def cleanup(self):
         # self.close()
