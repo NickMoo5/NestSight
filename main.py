@@ -8,7 +8,7 @@ from uart import UARTHandler, TxMsg, RxMsg
 import signal
 
 READY_LOG_INTERVAL = 5  # only log every Nth READY message to keep logs readable
-POLL_INTERVAL = 0.2  # seconds between READY/occupancy polls
+POLL_INTERVAL = 0.4  # seconds between READY/occupancy polls
 
 def sd_notify(msg):
     """Send a notification to systemd (no-op when not run under systemd)."""
@@ -116,7 +116,7 @@ class mainProcess:
                 print("[SYS] Birdie detected! Starting evaluation")
                 time.sleep(0.5)  # give the birdie a moment to settle before evaluation
                 self.qcm.run_evaluation()
-                time.sleep(1.5)  # give the birdie a moment to leave before resuming READY
+                time.sleep(0.7)  # give the birdie a moment to leave before resuming READY
 
                 print("[SYS] Evaluation complete, returning to READY")
 
