@@ -101,26 +101,25 @@ class mainProcess:
                         self.qcm.close_slide()
                         time.sleep(0.8)
 
-                # Transmit READY and keep checking for a birdie
+                # Check for a birdie BEFORE signalling READY, so one already
+                # in the QCM at startup gets evaluated before the first READY
+                if qcm_enabled:
+                    state = self.qcm.check_occupancy()
+                    if state:
+                        # Birdie detected: announce and run the evaluation process
+                        print("[SYS] Birdie detected! Starting evaluation")
+                        time.sleep(0.5)  # give the birdie a moment to settle before evaluation
+                        self.qcm.run_evaluation()
+                        time.sleep(0.7)  # give the birdie a moment to leave before resuming READY
+
+                        print("[SYS] Evaluation complete, returning to READY")
+                        # Re-check faults/occupancy before sending READY
+                        continue
+
+                # QCM is empty (or disabled): safe to transmit READY
                 ready_count += 1
                 self.uart.send(TxMsg.READY, log=(ready_count % READY_LOG_INTERVAL == 0))
-
-                if not qcm_enabled:
-                    time.sleep(POLL_INTERVAL)
-                    continue
-
-                state = self.qcm.check_occupancy()
-                if not state:
-                    time.sleep(POLL_INTERVAL)
-                    continue
-
-                # Birdie detected: announce and run the evaluation process
-                print("[SYS] Birdie detected! Starting evaluation")
-                time.sleep(0.5)  # give the birdie a moment to settle before evaluation
-                self.qcm.run_evaluation()
-                time.sleep(0.7)  # give the birdie a moment to leave before resuming READY
-
-                print("[SYS] Evaluation complete, returning to READY")
+                time.sleep(POLL_INTERVAL)
 
         except KeyboardInterrupt:
             print("Shutting down...")
