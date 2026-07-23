@@ -17,4 +17,4 @@ M2_MS3  = 16
 # --- QCM Enable Switch ---
 # Set to the BCM pin number once the switch is wired.
 # None = switch not hooked up yet, QCM is always enabled.
-QCM_ENABLE_SWITCH = None
+QCM_ENABLE_SWITCH = 16

@@ -6,8 +6,8 @@ import os
 from datetime import datetime
 
 # --- Crop region (shared with qcm.py so alg and camera preview stay in sync) ---
-CROP_Y_START = 100
-CROP_Y_END   = 304
+CROP_Y_START = 90
+CROP_Y_END   = 260
 CROP_X_START = 270
 CROP_X_END   = 335
 

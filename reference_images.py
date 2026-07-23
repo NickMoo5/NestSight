@@ -27,9 +27,9 @@ from nestSight import REFERENCE_DIR, REF_EMPTY_PATH, REF_BIRDIE_PATH
 
 # --- Crop region for occupancy reference images (placeholders, tune these) ---
 CROP_Y_START = 50
-CROP_Y_END   = 480
-CROP_X_START = 210
-CROP_X_END   = 490
+CROP_Y_END   = 310
+CROP_X_START = 200
+CROP_X_END   = 480
 
 REF_PATHS = {
     "empty": REF_EMPTY_PATH,

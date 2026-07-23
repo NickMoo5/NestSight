@@ -8,7 +8,7 @@ from uart import UARTHandler, TxMsg, RxMsg
 import signal
 
 READY_LOG_INTERVAL = 5  # only log every Nth READY message to keep logs readable
-POLL_INTERVAL = 0.4  # seconds between READY/occupancy polls
+POLL_INTERVAL = 0.2  # seconds between READY/occupancy polls
 
 def sd_notify(msg):
     """Send a notification to systemd (no-op when not run under systemd)."""
@@ -80,6 +80,7 @@ class mainProcess:
                 # Halt if a FAULT came in (including during a just-finished eval)
                 if self._fault_received():
                     print("[SYS] FAULT received! System halted, Ctrl+C to shut down")
+                    self.qcm.open_shutter()
                     while True:
                         time.sleep(1)
                         print("[SYS] System halted, Ctrl+C to shut down")
@@ -97,6 +98,7 @@ class mainProcess:
                     else:
                         print("[SYS] QCM disabled, opening shutter and pausing evaluation")
                         self.qcm.open_shutter()
+                        self.qcm.close_slide()
                         time.sleep(0.8)
 
                 # Transmit READY and keep checking for a birdie
