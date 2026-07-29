@@ -108,7 +108,8 @@ class mainProcess:
                     if state:
                         # Birdie detected: announce and run the evaluation process
                         print("[SYS] Birdie detected! Starting evaluation")
-                        time.sleep(0.5)  # give the birdie a moment to settle before evaluation
+                        self.uart.send(TxMsg.EVAL)
+                        time.sleep(0.3)  # give the birdie a moment to settle before evaluation
                         self.qcm.run_evaluation()
                         time.sleep(0.7)  # give the birdie a moment to leave before resuming READY
 

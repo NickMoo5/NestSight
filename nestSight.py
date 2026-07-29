@@ -559,7 +559,7 @@ def process_single_worker(data):
     h, w = img.shape[:2]
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    _, laser_mask = cv2.threshold(gray, 210, 255, cv2.THRESH_BINARY)
+    _, laser_mask = cv2.threshold(gray, 230, 255, cv2.THRESH_BINARY)
 
     # Ignore the bottom-left corner: zero out that region of the mask so
     # reflections/noise there never influence the line fit or gap math.

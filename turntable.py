@@ -3,7 +3,9 @@ from stepper_motor_driver import StepperDriver, Direction
 import time
 
 FULL_REV = 360
-TURNTABLE_SPEED = 0.00021
+# TURNTABLE_SPEED = 0.00021
+TURNTABLE_SPEED = 0.00028 # 1.84 seconds
+# TURNTABLE_SPEED = 0.00035
 # 0.00025
 
 class Turntable:
@@ -107,8 +109,11 @@ def main():
     # for i in range(90):
     #     # turntable.stepRamped(final_speed=0.0004)
     #     turntable.step(speed=0.0006)
+    start_time = time.perf_counter()
     while True:
         if turntable.step(speed=TURNTABLE_SPEED): break
+    elapsed = time.perf_counter() - start_time
+    print(f"Full rotation took {elapsed:.2f} seconds")
 
     turntable.cleanup()
     # try:
