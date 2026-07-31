@@ -13,6 +13,7 @@ from reportlab.lib.utils import ImageReader
 
 import matplotlib.pyplot as plt
 import multiprocessing as mp
+from enum import Enum
 
 def _worker_init():
     """Pool workers ignore Ctrl+C; the parent shuts them down deliberately."""
@@ -27,8 +28,14 @@ REF_BIRDIE_PATH = os.path.join(REFERENCE_DIR, "ref_birdie.png")
 
 # Gaussian blur kernel: smooths out per-birdie wear/tear differences
 OCCUPANCY_BLUR_KERNEL = (31, 31)
-# Mean abs pixel difference to the birdie reference below this counts as detected
+# Mean abs pixel difference to the closest reference below this counts as a match
 OCCUPANCY_MATCH_THRESHOLD = 21.3
+
+
+class BirdieState(Enum):
+    EMPTY = 0
+    BIRDIE = 1
+    ERROR = 2
 
 # -----------------------------
 # CLASS
@@ -70,8 +77,9 @@ class NestSight:
         self.pool = mp.Pool(processes=mp.cpu_count(), initializer=_worker_init)
         self.pending_results = []   
 
-        # Occupancy detection reference: load once at startup so the
+        # Occupancy detection references: load once at startup so the
         # continuous detection loop never touches the disk.
+        self._ref_empty = None
         self._ref_birdie = None
         try:
             self._load_occupancy_refs()
@@ -144,31 +152,45 @@ class NestSight:
         return cv2.GaussianBlur(img, OCCUPANCY_BLUR_KERNEL, 0)
 
     def _load_occupancy_refs(self):
-        if self._ref_birdie is None:
+        if self._ref_empty is None or self._ref_birdie is None:
+            ref_empty = cv2.imread(REF_EMPTY_PATH, cv2.IMREAD_GRAYSCALE)
             ref_birdie = cv2.imread(REF_BIRDIE_PATH, cv2.IMREAD_GRAYSCALE)
-            if ref_birdie is None:
+            if ref_empty is None or ref_birdie is None:
                 raise FileNotFoundError(
-                    f"Missing reference image ({REF_BIRDIE_PATH}). "
-                    "Generate it with reference_images.py first."
+                    f"Missing reference images ({REF_EMPTY_PATH}, {REF_BIRDIE_PATH}). "
+                    "Generate them with reference_images.py first."
                 )
+            self._ref_empty = cv2.GaussianBlur(ref_empty, OCCUPANCY_BLUR_KERNEL, 0)
             self._ref_birdie = cv2.GaussianBlur(ref_birdie, OCCUPANCY_BLUR_KERNEL, 0)
-        return self._ref_birdie
+        return self._ref_empty, self._ref_birdie
 
     def detect_occupancy(self, frame):
         """
-        Compare a frame (cropped the same way as the reference image) to the
-        birdie reference. Returns True if a birdie is detected.
+        Classify a frame (cropped the same way as the reference images) as
+        EMPTY, BIRDIE, or ERROR by comparing against the two reference images.
+
+        Returns a BirdieState.
         """
-        ref_birdie = self._load_occupancy_refs()
+        ref_empty, ref_birdie = self._load_occupancy_refs()
 
         gray = self._prep_occupancy_image(frame)
-        if gray.shape != ref_birdie.shape:
-            gray = cv2.resize(gray, (ref_birdie.shape[1], ref_birdie.shape[0]))
+        if gray.shape != ref_empty.shape:
+            gray = cv2.resize(gray, (ref_empty.shape[1], ref_empty.shape[0]))
 
+        diff_empty = float(np.mean(cv2.absdiff(gray, ref_empty)))
         diff_birdie = float(np.mean(cv2.absdiff(gray, ref_birdie)))
-        detected = diff_birdie <= OCCUPANCY_MATCH_THRESHOLD
-        print(f"[OCCUPANCY] diff={diff_birdie:.1f} threshold={OCCUPANCY_MATCH_THRESHOLD} detected={detected}")
-        return detected
+
+        if min(diff_empty, diff_birdie) > OCCUPANCY_MATCH_THRESHOLD:
+            # Looks like neither reference -> something unexpected in the module
+            state = BirdieState.ERROR
+        elif diff_empty <= diff_birdie:
+            state = BirdieState.EMPTY
+        else:
+            state = BirdieState.BIRDIE
+
+        print(f"[OCCUPANCY] diff_empty={diff_empty:.1f} diff_birdie={diff_birdie:.1f} "
+              f"threshold={OCCUPANCY_MATCH_THRESHOLD} state={state.name}")
+        return state
 
     # -----------------------------
     # ANALYSIS

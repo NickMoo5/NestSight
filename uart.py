@@ -29,6 +29,7 @@ class TxMsg(Enum):
     READY = "READY"
     SET = "SET"
     EVAL = "EVAL"
+    FAULT = "FAULT"
     NONE = "NONE"
     UNKNOWN = "UNKNOWN"
 

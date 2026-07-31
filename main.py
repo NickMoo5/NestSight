@@ -4,6 +4,7 @@ import socket
 from enum import Enum
 import cv2
 from qcm import Qcm
+from nestSight import BirdieState
 from uart import UARTHandler, TxMsg, RxMsg
 import signal
 
@@ -71,6 +72,7 @@ class mainProcess:
         sd_notify("READY=1")  # init done, systemd can consider us started
         ready_count = 0
         qcm_enabled = True  # Qcm starts enabled with the shutter closed
+        fault_flag = False  # set locally (e.g. occupancy ERROR) to trigger the halt block
 
         try:
             while True:
@@ -78,7 +80,8 @@ class mainProcess:
                 sd_notify("WATCHDOG=1")
 
                 # Halt if a FAULT came in (including during a just-finished eval)
-                if self._fault_received():
+                # or was raised locally via fault_flag
+                if fault_flag or self._fault_received():
                     print("[SYS] FAULT received! System halted, Ctrl+C to shut down")
                     self.qcm.open_shutter()
                     while True:
@@ -105,7 +108,7 @@ class mainProcess:
                 # in the QCM at startup gets evaluated before the first READY
                 if qcm_enabled:
                     state = self.qcm.check_occupancy()
-                    if state:
+                    if state == BirdieState.BIRDIE:
                         # Birdie detected: announce and run the evaluation process
                         print("[SYS] Birdie detected! Starting evaluation")
                         self.uart.send(TxMsg.EVAL)
@@ -115,6 +118,18 @@ class mainProcess:
 
                         print("[SYS] Evaluation complete, returning to READY")
                         # Re-check faults/occupancy before sending READY
+                        continue
+                    if state == BirdieState.ERROR:
+                        # Module contents match neither reference: re-check
+                        # after a short settle, and if still in ERROR report
+                        # a FAULT over UART and halt via the fault block at
+                        # the top of the loop.
+                        time.sleep(0.8)
+                        if self.qcm.check_occupancy() == BirdieState.ERROR:
+                            print("[SYS] Occupancy ERROR: module doesn't match empty or birdie reference")
+                            self.uart.send(TxMsg.FAULT)
+                            fault_flag = True
+                        time.sleep(POLL_INTERVAL)
                         continue
 
                 # QCM is empty (or disabled): safe to transmit READY

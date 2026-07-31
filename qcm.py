@@ -7,7 +7,7 @@ import hardware_defines as hw
 from shutter import Shutter
 from turntable import TURNTABLE_SPEED, Turntable
 from picamera2 import Picamera2
-from nestSight import NestSight
+from nestSight import NestSight, BirdieState
 import cv2
 import capture_images_rotation
 from servo_driver_hw import ServoDriverHW
@@ -112,10 +112,10 @@ class Qcm:
         return lgpio.gpio_read(self._gpio_h, hw.QCM_ENABLE_SWITCH) == 1
 
     def check_occupancy(self):
-        """Return True if a birdie is detected in the latest frame."""
+        """Classify the latest frame as EMPTY, BIRDIE, or ERROR."""
         frame = self.latest_frame
         if frame is None:
-            return False
+            return BirdieState.ERROR
         cropped = frame[OCC_Y_START:OCC_Y_END, OCC_X_START:OCC_X_END]
         return self.nestSight.detect_occupancy(cropped)
 
