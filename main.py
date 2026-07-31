@@ -123,6 +123,7 @@ class mainProcess:
                         # after a short settle, and if still in ERROR report
                         # a FAULT over UART and halt via the fault block at
                         # the top of the loop.
+                        self.uart.send(TxMsg.EVAL)
                         time.sleep(1.3)
                         if self.qcm.check_occupancy() == BirdieState.ERROR:
                             print("[SYS] Occupancy ERROR: module doesn't match empty or birdie reference")
@@ -131,7 +132,6 @@ class mainProcess:
                         elif state == BirdieState.BIRDIE:
                             # Birdie detected: announce and run the evaluation process
                             print("[SYS] Birdie detected! Starting evaluation")
-                            self.uart.send(TxMsg.EVAL)
                             # time.sleep(0.3)  # give the birdie a moment to settle before evaluation
                             self.qcm.run_evaluation()
                             time.sleep(1)  # give the birdie a moment to leave before resuming READY
