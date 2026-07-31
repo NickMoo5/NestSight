@@ -86,7 +86,6 @@ class mainProcess:
                     self.qcm.open_shutter()
                     while True:
                         time.sleep(1)
-                        print("[SYS] System halted, Ctrl+C to shut down")
                         sd_notify("WATCHDOG=1")  # intentionally halted, not hung
 
                 # QCM enable switch: when disabled, keep sending READY but
