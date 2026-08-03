@@ -31,6 +31,20 @@ OCCUPANCY_BLUR_KERNEL = (31, 31)
 # Mean abs pixel difference to the closest reference below this counts as a match
 OCCUPANCY_MATCH_THRESHOLD = 21.3
 
+# -----------------------------
+# ANALYSIS THRESHOLDS
+# Referenced by BOTH the classification logic and the log/PDF text, so the
+# numbers displayed always match the numbers actually used.
+# -----------------------------
+MAX_GAP_FAIL_THRESHOLD = 12        # % single-frame gap above this -> FAIL
+AVG_GAP_FAIL_THRESHOLD = 1        # % average gap above this -> FAIL
+HIGH_GAP_RATIO_FAIL_THRESHOLD = 10  # % of frames with significant gaps above this -> FAIL
+SIGNIFICANT_GAP_THRESHOLD = 5      # % gap in a frame that counts as "significant"
+FFT_PASS_THRESHOLD = 6             # FFT score above this = strong periodic structure (PASS)
+FFT_BORDERLINE_THRESHOLD = 1.8     # FFT score above this = borderline structure
+SPIKE_DEVIATION_THRESHOLD = 30     # px above baseline to count as a spike
+SPIKE_MIN_WIDTH = 5                # consecutive frames required to form a spike region
+
 
 class BirdieState(Enum):
     EMPTY = 0
@@ -211,7 +225,7 @@ class NestSight:
         g = np.array(self.gap_values)
         self.avg_gap = np.mean(g)
         self.max_gap = np.max(g)
-        self.high_gap_ratio = np.sum(g > 5) / len(g) * 100
+        self.high_gap_ratio = np.sum(g > SIGNIFICANT_GAP_THRESHOLD) / len(g) * 100
 
     def _detect_spikes(self):
         if len(self.top_points) < 10:
@@ -223,7 +237,7 @@ class NestSight:
         baseline = np.median(y_smooth)
         deviation = y_smooth - baseline
 
-        mask = deviation > 30
+        mask = deviation > SPIKE_DEVIATION_THRESHOLD
 
         self.spike_regions = []
         start = None
@@ -232,12 +246,12 @@ class NestSight:
             if val and start is None:
                 start = i
             elif not val and start is not None:
-                if i - start >= 5:
+                if i - start >= SPIKE_MIN_WIDTH:
                     self.spike_regions.append((start, i))
                 start = None
 
         # Handle any region that goes till the end
-        if start is not None and len(mask) - start >= 5:
+        if start is not None and len(mask) - start >= SPIKE_MIN_WIDTH:
             self.spike_regions.append((start, len(mask)))
 
         # -----------------------------
@@ -269,32 +283,32 @@ class NestSight:
         self.fft_score = score
 
         # Classify result
-        if score > 6:
-            self.fourier_result = f"GOOD (strong periodic structure, score={score:.2f})"
-        elif score > 1.8:
-            self.fourier_result = f"BORDERLINE (minor irregularities, score={score:.2f})"
+        if score > FFT_PASS_THRESHOLD:
+            self.fourier_result = f"GOOD (strong periodic structure, score={score:.2f} > {FFT_PASS_THRESHOLD:g})"
+        elif score > FFT_BORDERLINE_THRESHOLD:
+            self.fourier_result = f"BORDERLINE (minor irregularities, score={score:.2f} > {FFT_BORDERLINE_THRESHOLD:g})"
         else:
-            self.fourier_result = f"DEFECT SUSPECTED (irregular structure, score={score:.2f})"
+            self.fourier_result = f"DEFECT SUSPECTED (irregular structure, score={score:.2f} <= {FFT_BORDERLINE_THRESHOLD:g})"
 
     def _classify(self):
         # Determine final result and print a human-readable reason for debugging
-        if self.max_gap > 25:
-            reason = f"Max gap too large: {self.max_gap:.2f}% (>25%)"
+        if self.max_gap > MAX_GAP_FAIL_THRESHOLD:
+            reason = f"Max gap too large: {self.max_gap:.2f}% (>{MAX_GAP_FAIL_THRESHOLD:g}%)"
             self.final_result = "FAIL"
-        elif self.avg_gap > 10:
-            reason = f"Average gap too large: {self.avg_gap:.2f}% (>10%)"
+        elif self.avg_gap > AVG_GAP_FAIL_THRESHOLD:
+            reason = f"Average gap too large: {self.avg_gap:.2f}% (>{AVG_GAP_FAIL_THRESHOLD:g}%)"
             self.final_result = "FAIL"
-        elif self.high_gap_ratio > 20:
-            reason = f"High gap ratio: {self.high_gap_ratio:.1f}% (>20%)"
+        elif self.high_gap_ratio > HIGH_GAP_RATIO_FAIL_THRESHOLD:
+            reason = f"High gap ratio: {self.high_gap_ratio:.1f}% (>{HIGH_GAP_RATIO_FAIL_THRESHOLD:g}%)"
             self.final_result = "FAIL"
         elif len(self.spike_regions) > 0:
             reason = f"Spike regions detected: {len(self.spike_regions)} region(s)"
             self.final_result = "FAIL"
-        elif self.fft_score > 6:
-            reason = f"FFT score indicates PASS: {self.fft_score:.2f} (>6)"
+        elif self.fft_score > FFT_PASS_THRESHOLD:
+            reason = f"FFT score indicates PASS: {self.fft_score:.2f} (>{FFT_PASS_THRESHOLD:g})"
             self.final_result = "PASS"
         else:
-            reason = f"No passing criteria met (fft_score={self.fft_score:.2f})"
+            reason = f"No passing criteria met (fft_score={self.fft_score:.2f} <= {FFT_PASS_THRESHOLD:g})"
             self.final_result = "FAIL"
 
         print(f"[CLASSIFY] Final Result: {self.final_result} -- {reason}")
@@ -457,9 +471,11 @@ class NestSight:
 
         # Gap statistics
         story.append(Paragraph("<b>Gap Statistics:</b>", styles['Heading2']))
-        story.append(Paragraph(f"Average Gap: {self.avg_gap:.2f}%", styles['Normal']))
-        story.append(Paragraph(f"Max Gap: {self.max_gap:.2f}%", styles['Normal']))
-        story.append(Paragraph(f"Frames with Significant Gaps (>5%): {self.high_gap_ratio:.1f}%", styles['Normal']))
+        story.append(Paragraph(f"Average Gap: {self.avg_gap:.2f}% (fail if >{AVG_GAP_FAIL_THRESHOLD:g}%)", styles['Normal']))
+        story.append(Paragraph(f"Max Gap: {self.max_gap:.2f}% (fail if >{MAX_GAP_FAIL_THRESHOLD:g}%)", styles['Normal']))
+        story.append(Paragraph(
+            f"Frames with Significant Gaps (>{SIGNIFICANT_GAP_THRESHOLD:g}%): {self.high_gap_ratio:.1f}% "
+            f"(fail if >{HIGH_GAP_RATIO_FAIL_THRESHOLD:g}%)", styles['Normal']))
         story.append(Spacer(1, 10))
 
         story.append(Paragraph("<b>Final Result:</b>", styles['Heading2']))

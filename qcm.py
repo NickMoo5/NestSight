@@ -154,7 +154,6 @@ class Qcm:
         self.open_shutter()
         time.sleep(0.8)
         self.close_shutter()
-        self.close_slide()
         time.sleep(1)
         self.servo.detach()
         self.slide.detach()

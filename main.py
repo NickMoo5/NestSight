@@ -84,6 +84,10 @@ class mainProcess:
                 if fault_flag or self._fault_received():
                     print("[SYS] FAULT received! System halted, Ctrl+C to shut down")
                     self.qcm.open_shutter()
+                    self.qcm.open_slide()
+                    time.sleep(1)
+                    self.qcm.slide.detach()
+                    self.qcm.servo.detach()
                     while True:
                         time.sleep(1)
                         sd_notify("WATCHDOG=1")  # intentionally halted, not hung
@@ -95,13 +99,15 @@ class mainProcess:
                     qcm_enabled = enabled
                     if enabled:
                         print("[SYS] QCM enabled, closing shutter and resuming evaluation")
+                        time.sleep(2)
                         self.qcm.close_shutter()
-                        time.sleep(0.8)
+                        self.qcm.slide.detach()
+                        time.sleep(1)
                     else:
                         print("[SYS] QCM disabled, opening shutter and pausing evaluation")
                         self.qcm.open_shutter()
                         self.qcm.close_slide()
-                        time.sleep(0.8)
+                        time.sleep(2)
 
                 # Check for a birdie BEFORE signalling READY, so one already
                 # in the QCM at startup gets evaluated before the first READY
