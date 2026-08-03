@@ -29,7 +29,7 @@ REF_BIRDIE_PATH = os.path.join(REFERENCE_DIR, "ref_birdie.png")
 # Gaussian blur kernel: smooths out per-birdie wear/tear differences
 OCCUPANCY_BLUR_KERNEL = (31, 31)
 # Mean abs pixel difference to the closest reference below this counts as a match
-OCCUPANCY_MATCH_THRESHOLD = 27
+OCCUPANCY_MATCH_THRESHOLD = 29
 
 # -----------------------------
 # ANALYSIS THRESHOLDS
