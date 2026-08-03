@@ -29,7 +29,7 @@ REF_BIRDIE_PATH = os.path.join(REFERENCE_DIR, "ref_birdie.png")
 # Gaussian blur kernel: smooths out per-birdie wear/tear differences
 OCCUPANCY_BLUR_KERNEL = (31, 31)
 # Mean abs pixel difference to the closest reference below this counts as a match
-OCCUPANCY_MATCH_THRESHOLD = 21.3
+OCCUPANCY_MATCH_THRESHOLD = 27
 
 # -----------------------------
 # ANALYSIS THRESHOLDS
@@ -38,12 +38,12 @@ OCCUPANCY_MATCH_THRESHOLD = 21.3
 # -----------------------------
 MAX_GAP_FAIL_THRESHOLD = 12        # % single-frame gap above this -> FAIL
 AVG_GAP_FAIL_THRESHOLD = 1        # % average gap above this -> FAIL
-HIGH_GAP_RATIO_FAIL_THRESHOLD = 10  # % of frames with significant gaps above this -> FAIL
+HIGH_GAP_RATIO_FAIL_THRESHOLD = 3.5  # % of frames with significant gaps above this -> FAIL
 SIGNIFICANT_GAP_THRESHOLD = 5      # % gap in a frame that counts as "significant"
 FFT_PASS_THRESHOLD = 6             # FFT score above this = strong periodic structure (PASS)
 FFT_BORDERLINE_THRESHOLD = 1.8     # FFT score above this = borderline structure
 SPIKE_DEVIATION_THRESHOLD = 30     # px above baseline to count as a spike
-SPIKE_MIN_WIDTH = 5                # consecutive frames required to form a spike region
+SPIKE_MIN_WIDTH = 3                # consecutive frames required to form a spike region
 
 
 class BirdieState(Enum):
