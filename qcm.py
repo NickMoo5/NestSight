@@ -132,7 +132,7 @@ class Qcm:
 
     def close_shutter(self):
         # Override driver close(): manually set to min
-        self.servo.move_to_value(-0.9, False)
+        self.servo.move_to_value(-0.8, False)
 
     def open_slide(self):
         self.slide.open()

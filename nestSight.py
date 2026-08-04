@@ -36,11 +36,11 @@ OCCUPANCY_MATCH_THRESHOLD = 29
 # Referenced by BOTH the classification logic and the log/PDF text, so the
 # numbers displayed always match the numbers actually used.
 # -----------------------------
-MAX_GAP_FAIL_THRESHOLD = 12        # % single-frame gap above this -> FAIL
-AVG_GAP_FAIL_THRESHOLD = 1        # % average gap above this -> FAIL
+MAX_GAP_FAIL_THRESHOLD = 10        # % single-frame gap above this -> FAIL
+AVG_GAP_FAIL_THRESHOLD = 0.4        # % average gap above this -> FAIL
 HIGH_GAP_RATIO_FAIL_THRESHOLD = 3.5  # % of frames with significant gaps above this -> FAIL
 SIGNIFICANT_GAP_THRESHOLD = 5      # % gap in a frame that counts as "significant"
-FFT_PASS_THRESHOLD = 6             # FFT score above this = strong periodic structure (PASS)
+FFT_PASS_THRESHOLD = 7             # FFT score above this = strong periodic structure (PASS)
 FFT_BORDERLINE_THRESHOLD = 1.8     # FFT score above this = borderline structure
 SPIKE_DEVIATION_THRESHOLD = 30     # px above baseline to count as a spike
 SPIKE_MIN_WIDTH = 3                # consecutive frames required to form a spike region
@@ -220,11 +220,13 @@ class NestSight:
     def _compute_gap_stats(self):
         if not self.gap_values:
             self.avg_gap = self.max_gap = self.high_gap_ratio = 0
+            self.max_gap_frame = None
             return
 
         g = np.array(self.gap_values)
         self.avg_gap = np.mean(g)
         self.max_gap = np.max(g)
+        self.max_gap_frame = int(np.argmax(g))
         self.high_gap_ratio = np.sum(g > SIGNIFICANT_GAP_THRESHOLD) / len(g) * 100
 
     def _detect_spikes(self):
@@ -472,7 +474,9 @@ class NestSight:
         # Gap statistics
         story.append(Paragraph("<b>Gap Statistics:</b>", styles['Heading2']))
         story.append(Paragraph(f"Average Gap: {self.avg_gap:.2f}% (fail if >{AVG_GAP_FAIL_THRESHOLD:g}%)", styles['Normal']))
-        story.append(Paragraph(f"Max Gap: {self.max_gap:.2f}% (fail if >{MAX_GAP_FAIL_THRESHOLD:g}%)", styles['Normal']))
+        story.append(Paragraph(
+            f"Max Gap: {self.max_gap:.2f}% at frame {self.max_gap_frame} "
+            f"(fail if >{MAX_GAP_FAIL_THRESHOLD:g}%)", styles['Normal']))
         story.append(Paragraph(
             f"Frames with Significant Gaps (>{SIGNIFICANT_GAP_THRESHOLD:g}%): {self.high_gap_ratio:.1f}% "
             f"(fail if >{HIGH_GAP_RATIO_FAIL_THRESHOLD:g}%)", styles['Normal']))
