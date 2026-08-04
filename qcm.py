@@ -20,6 +20,7 @@ from reference_images import (
 )
 
 NO_SHUTTER = True
+FAULT_FRAME_DIR = "fault_frames"  # frames that triggered an occupancy FAULT
 
 class Qcm:
 
@@ -50,6 +51,7 @@ class Qcm:
                 lgpio.gpio_claim_input(self._gpio_h, hw.QCM_ENABLE_SWITCH, lgpio.SET_PULL_UP)
 
             self.latest_frame = None
+            self.last_occupancy_frame = None
             self.close_shutter()
         except BaseException:
             # Construction failed partway (error or Ctrl+C): release whatever
@@ -114,10 +116,23 @@ class Qcm:
     def check_occupancy(self):
         """Classify the latest frame as EMPTY, BIRDIE, or ERROR."""
         frame = self.latest_frame
+        self.last_occupancy_frame = frame  # kept so save_fault_frame() stores the exact frame classified
         if frame is None:
             return BirdieState.ERROR
         cropped = frame[OCC_Y_START:OCC_Y_END, OCC_X_START:OCC_X_END]
         return self.nestSight.detect_occupancy(cropped)
+
+    def save_fault_frame(self):
+        """Save the frame from the last occupancy check for later review."""
+        frame = self.last_occupancy_frame
+        if frame is None:
+            print("[FAULT] No frame available to save")
+            return None
+        os.makedirs(FAULT_FRAME_DIR, exist_ok=True)
+        path = os.path.join(FAULT_FRAME_DIR, f"fault_{time.strftime('%Y%m%d_%H%M%S')}.png")
+        cv2.imwrite(path, frame)
+        print(f"[FAULT] Saved fault frame to {path}")
+        return path
 
     def drop(self):
         self.open_shutter()

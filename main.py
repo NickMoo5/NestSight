@@ -133,6 +133,7 @@ class mainProcess:
                         time.sleep(1.3)
                         if self.qcm.check_occupancy() == BirdieState.ERROR:
                             print("[SYS] Occupancy ERROR: module doesn't match empty or birdie reference")
+                            self.qcm.save_fault_frame()
                             self.uart.send(TxMsg.FAULT)
                             fault_flag = True
                         elif state == BirdieState.BIRDIE:
