@@ -40,7 +40,7 @@ MAX_GAP_FAIL_THRESHOLD = 10        # % single-frame gap above this -> FAIL
 AVG_GAP_FAIL_THRESHOLD = 0.4        # % average gap above this -> FAIL
 HIGH_GAP_RATIO_FAIL_THRESHOLD = 3.5  # % of frames with significant gaps above this -> FAIL
 SIGNIFICANT_GAP_THRESHOLD = 5      # % gap in a frame that counts as "significant"
-FFT_PASS_THRESHOLD = 7.5             # FFT score above this = strong periodic structure (PASS)
+FFT_PASS_THRESHOLD = 8.5             # FFT score above this = strong periodic structure (PASS)
 FFT_BORDERLINE_THRESHOLD = 1.8     # FFT score above this = borderline structure
 SPIKE_DEVIATION_THRESHOLD = 30     # px above baseline to count as a spike
 SPIKE_MIN_WIDTH = 3                # consecutive frames required to form a spike region
